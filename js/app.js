@@ -474,9 +474,9 @@ function sessionExerciseCard(se, i) {
   const ex = exerciseById(se.exerciseId);
   const allDone = se.done.every(Boolean);
   return `
-    <div class="card ex-card ${allDone ? "complete" : ""}">
+    <div class="card ex-card ${allDone ? "complete" : ""}" style="animation-delay:${Math.min(i * 0.05, 0.3)}s">
       <div class="ex-card-head">
-        <div class="ex-pose">${POSES[ex.pose]}</div>
+        <div class="ex-pose">${POSES[ex.pose]}${allDone ? `<span class="complete-badge">✓</span>` : ""}</div>
         <div>
           <h3>${ex.name}</h3>
           <p class="muted">${se.sets} sets × ${se.reps}${ex.isHold ? " sec" : " reps"}</p>
@@ -484,7 +484,7 @@ function sessionExerciseCard(se, i) {
       </div>
       <details class="ex-steps"><summary>How to</summary><ol>${ex.steps.map((s) => `<li>${s}</li>`).join("")}</ol></details>
       <div class="set-row">
-        ${se.done.map((d, si) => `<button class="set-check ${d ? "on" : ""}" onclick="toggleSet(${i},${si})">Set ${si + 1}</button>`).join("")}
+        ${se.done.map((d, si) => `<button class="set-check ${d ? "on" : ""}" onclick="toggleSet(${i},${si})"><span class="dot-ind"></span>Set ${si + 1}</button>`).join("")}
       </div>
     </div>
   `;

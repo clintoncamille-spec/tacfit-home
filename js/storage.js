@@ -20,6 +20,8 @@ function defaultDB() {
     workoutHistory: [],     // [{date, planDayId, exerciseResults:[{exerciseId,setsDone,setsPrescribed}], durationMin, completionPct}]
     currentPlan: null,      // generated weekly plan, regenerated when profile changes
     activeSession: null,    // in-progress workout session state, so a refresh doesn't lose progress
+    workoutTemplates: [],   // [{id, name, exercises:[{exerciseId,sets,reps}], createdAt, updatedAt}]
+    progressPhotos: [],     // [{id, date, storagePath, createdAt}] — metadata only, image bytes live in Supabase Storage
   };
 }
 
@@ -36,6 +38,7 @@ const Store = {
     const db = loadDB();
     db.profile = profile;
     saveDB(db);
+    if (typeof Sync !== "undefined") Sync.schedulePush();
   },
 
   logWeight(weightKg, date) {
@@ -43,6 +46,7 @@ const Store = {
     db.weightLog.push({ date: date || todayISO(), weightKg });
     db.weightLog.sort((a, b) => a.date.localeCompare(b.date));
     saveDB(db);
+    if (typeof Sync !== "undefined") Sync.schedulePush();
   },
 
   logTest(pushups, pullups, date) {
@@ -50,6 +54,7 @@ const Store = {
     db.testLog.push({ date: date || todayISO(), pushups, pullups });
     db.testLog.sort((a, b) => a.date.localeCompare(b.date));
     saveDB(db);
+    if (typeof Sync !== "undefined") Sync.schedulePush();
   },
 
   savePlan(plan) {
@@ -75,10 +80,47 @@ const Store = {
     db.workoutHistory.push(entry);
     db.activeSession = null;
     saveDB(db);
+    if (typeof Sync !== "undefined") Sync.schedulePush();
   },
 
   resetAll() {
     localStorage.removeItem(DB_KEY);
+  },
+
+  // Local-only, deliberately not synced (see supabase/schema.sql note) — same tier as
+  // currentPlan/activeSession.
+  getTemplates() { return loadDB().workoutTemplates; },
+
+  saveTemplate(template) {
+    const db = loadDB();
+    const idx = db.workoutTemplates.findIndex((t) => t.id === template.id);
+    if (idx >= 0) db.workoutTemplates[idx] = template;
+    else db.workoutTemplates.push(template);
+    saveDB(db);
+  },
+
+  deleteTemplate(id) {
+    const db = loadDB();
+    db.workoutTemplates = db.workoutTemplates.filter((t) => t.id !== id);
+    saveDB(db);
+  },
+
+  // Requires an account — the image bytes live in Supabase Storage, only the pointer is local.
+  getProgressPhotos() { return loadDB().progressPhotos; },
+
+  addProgressPhoto(photo) {
+    const db = loadDB();
+    db.progressPhotos.push(photo);
+    db.progressPhotos.sort((a, b) => a.date.localeCompare(b.date));
+    saveDB(db);
+    if (typeof Sync !== "undefined") Sync.schedulePush();
+  },
+
+  deleteProgressPhoto(id) {
+    const db = loadDB();
+    db.progressPhotos = db.progressPhotos.filter((p) => p.id !== id);
+    saveDB(db);
+    if (typeof Sync !== "undefined") Sync.schedulePush();
   },
 };
 

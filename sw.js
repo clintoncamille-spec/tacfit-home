@@ -1,11 +1,14 @@
 // Cache-first service worker so the whole app works with zero network connectivity
 // after the first successful load.
-const CACHE = "tacfit-v1";
+const CACHE = "tacfit-v12";
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
   "./css/styles.css",
+  "./js/supabaseClient.js",
+  "./js/auth.js",
+  "./js/sync.js",
   "./js/poses.js",
   "./js/exercises.js",
   "./js/storage.js",
@@ -31,6 +34,14 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  // Never cache-first cross-origin requests (Supabase auth/API calls, the Supabase CDN script) —
+  // those need to always hit the network live, not serve stale cached responses.
+  if (new URL(event.request.url).origin !== self.location.origin) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;

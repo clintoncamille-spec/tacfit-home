@@ -1,12 +1,36 @@
 // TacFit Home — app shell, router and views. Vanilla JS, no build step, fully offline.
 "use strict";
 
-const App = { root: null, draft: {}, step: 0, restTimer: null };
+const App = {
+  root: null, draft: {}, step: 0, user: null, templateEditing: null, templatePickerOpen: false, templatePickerCat: "all",
+  restTimer: null, restAutoCloseTimer: null, restActive: false, restDone: false, restDuration: 60, restRemaining: 0, audioCtx: null,
+  historyExerciseId: null,
+  calendarMonthOffset: 0,
+  photoLightboxId: null, photoLightboxUrl: null,
+};
 
 document.addEventListener("DOMContentLoaded", () => {
   App.root = document.getElementById("app");
   window.addEventListener("hashchange", render);
   render();
+
+  if (typeof Auth !== "undefined" && Auth.isAvailable()) {
+    Auth.currentUser().then((u) => {
+      App.user = u;
+      Sync._user = u;
+      if (u) Sync.pullRemote().then(() => { if (route() !== "onboarding" && route() !== "session") render(); });
+    });
+    Auth.onChange((u) => {
+      App.user = u;
+      const screen = document.getElementById("screen");
+      if (screen && route() === "settings") renderSettings(screen);
+    });
+    Sync.setStatusListener(() => {
+      const screen = document.getElementById("screen");
+      if (screen && route() === "settings") renderSettings(screen);
+    });
+  }
+
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
@@ -26,6 +50,8 @@ function render() {
 
   if (r === "onboarding") return renderOnboarding();
   if (r === "session") return renderSession();
+  if (r === "templates") return renderTemplates();
+  if (r === "exercise-history") return renderExerciseHistory();
 
   // all other routes share the tab-bar chrome
   App.root.innerHTML = `<div class="screen" id="screen"></div>${navBarHTML(r)}`;
@@ -365,6 +391,44 @@ function finishOnboarding() {
 
 // ---------- Dashboard ----------
 
+function calendarHTML(workoutHistory) {
+  const workoutDates = new Set(workoutHistory.map((w) => w.date));
+  const now = new Date();
+  const base = new Date(now.getFullYear(), now.getMonth() + App.calendarMonthOffset, 1);
+  const year = base.getFullYear(), month = base.getMonth();
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthLabel = base.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const todayStr = todayISO();
+
+  const cells = [];
+  for (let i = 0; i < firstDayOfWeek; i++) cells.push(`<div class="cal-cell cal-blank"></div>`);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const classes = ["cal-cell"];
+    if (workoutDates.has(dateStr)) classes.push("cal-worked");
+    if (dateStr === todayStr) classes.push("cal-today");
+    cells.push(`<div class="${classes.join(" ")}"><span>${d}</span></div>`);
+  }
+
+  return `
+    <div class="card">
+      <div class="cal-head">
+        <button class="btn-icon" onclick="shiftCalendarMonth(-1)">&larr;</button>
+        <div class="eyebrow">${monthLabel}</div>
+        <button class="btn-icon" onclick="shiftCalendarMonth(1)">&rarr;</button>
+      </div>
+      <div class="cal-weekdays">${["S", "M", "T", "W", "T", "F", "S"].map((d) => `<span>${d}</span>`).join("")}</div>
+      <div class="cal-grid">${cells.join("")}</div>
+    </div>`;
+}
+
+function shiftCalendarMonth(delta) {
+  App.calendarMonthOffset += delta;
+  const screen = document.getElementById("screen");
+  if (screen) renderDashboard(screen);
+}
+
 function renderDashboard(screen) {
   const db = Store.get();
   const profile = db.profile;
@@ -382,11 +446,15 @@ function renderDashboard(screen) {
       <p class="muted">${new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</p>
     </div>
 
+    ${accountBannerHTML()}
+
     <div class="stat-row">
       <div class="stat-tile"><span class="stat-num">${streak}</span><span class="stat-label">Day Streak</span></div>
       <div class="stat-tile"><span class="stat-num">${thisWeekCount}/${profile.prescribedFrequency}</span><span class="stat-label">This Week</span></div>
       <div class="stat-tile"><span class="stat-num">${bmi ? bmi.toFixed(1) : "—"}</span><span class="stat-label">${cat.label}</span></div>
     </div>
+
+    ${calendarHTML(db.workoutHistory)}
 
     <div class="card plan-card">
       <div class="plan-card-head">
@@ -398,6 +466,7 @@ function renderDashboard(screen) {
       </div>
       ${day ? `<div class="chip-row">${day.exercises.slice(0, 6).map((ex) => `<span class="chip">${exerciseById(ex.exerciseId).name}</span>`).join("")}</div>` : `<p class="muted">No plan yet — check your Profile to set a frequency.</p>`}
       ${day ? `<button class="btn btn-primary btn-block" onclick="startWorkout(${day.dayIndex})">${resumable ? "Resume Workout" : "Start Workout"}</button>` : ""}
+      <button class="btn btn-secondary btn-block" onclick="go('templates')">Start From Template</button>
     </div>
 
     <div class="card">
@@ -425,10 +494,33 @@ function computeStreak(history) {
 }
 
 function countThisWeek(history) {
+  const startISO = weekStartISO();
+  return history.filter((h) => h.date >= startISO).length;
+}
+
+function weekStartISO() {
   const now = new Date();
   const start = new Date(now); start.setDate(now.getDate() - now.getDay());
-  const startISO = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
-  return history.filter((h) => h.date >= startISO).length;
+  return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
+}
+
+const BANNER_DISMISS_KEY = "tacfit_account_banner_dismissed";
+
+function accountBannerHTML() {
+  if (typeof Auth === "undefined" || !Auth.isAvailable() || App.user || localStorage.getItem(BANNER_DISMISS_KEY)) return "";
+  return `
+    <div class="card account-banner">
+      <p>Create a free account to sync your progress across devices.</p>
+      <div class="row2">
+        <button class="btn btn-secondary" onclick="dismissAccountBanner()">Not now</button>
+        <button class="btn btn-primary" onclick="go('settings')">Set Up</button>
+      </div>
+    </div>`;
+}
+
+function dismissAccountBanner() {
+  localStorage.setItem(BANNER_DISMISS_KEY, "1");
+  render();
 }
 
 // ---------- Workout Session ----------
@@ -440,7 +532,7 @@ function startWorkout(dayIndex) {
   const session = db.activeSession && db.activeSession.dayIndex === dayIndex ? db.activeSession : {
     dayIndex,
     startedAt: Date.now(),
-    exercises: day.exercises.map((ex) => ({ exerciseId: ex.exerciseId, sets: ex.sets, reps: ex.reps, done: new Array(ex.sets).fill(false) })),
+    exercises: day.exercises.map((ex) => ({ exerciseId: ex.exerciseId, sets: ex.sets, reps: ex.reps, done: new Array(ex.sets).fill(false), warmup: new Array(ex.sets).fill(false) })),
   };
   Store.saveSession(session);
   go("session");
@@ -461,17 +553,21 @@ function renderSession() {
         <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
         <span class="muted">${pct}%</span>
       </div>
-      <div id="rest-banner"></div>
+      ${warmupSuggestionsHTML(session)}
       <div class="exercise-list">
         ${session.exercises.map((se, i) => sessionExerciseCard(se, i)).join("")}
       </div>
       <button class="btn btn-primary btn-block finish-btn" onclick="finishWorkout()">Finish Workout</button>
     </div>
+    ${App.restActive ? restModalHTML() : ""}
   `;
 }
 
+// Bodyweight app, no external weight tracking — sets marked as warm-up still count toward
+// "done" (the workout itself), they're just excluded from volume/PR calculations later.
 function sessionExerciseCard(se, i) {
   const ex = exerciseById(se.exerciseId);
+  const warmup = se.warmup || new Array(se.sets).fill(false);
   const allDone = se.done.every(Boolean);
   return `
     <div class="card ex-card ${allDone ? "complete" : ""}" style="animation-delay:${Math.min(i * 0.05, 0.3)}s">
@@ -484,7 +580,12 @@ function sessionExerciseCard(se, i) {
       </div>
       <details class="ex-steps"><summary>How to</summary><ol>${ex.steps.map((s) => `<li>${s}</li>`).join("")}</ol></details>
       <div class="set-row">
-        ${se.done.map((d, si) => `<button class="set-check ${d ? "on" : ""}" onclick="toggleSet(${i},${si})"><span class="dot-ind"></span>Set ${si + 1}</button>`).join("")}
+        ${se.done.map((d, si) => `
+          <div class="set-pair">
+            <button class="set-check ${d ? "on" : ""} ${warmup[si] ? "warmup" : ""}" onclick="toggleSet(${i},${si})"><span class="dot-ind"></span>Set ${si + 1}</button>
+            <button class="set-warmup-btn ${warmup[si] ? "on" : ""}" onclick="toggleSetWarmup(${i},${si})" title="Mark set ${si + 1} as warm-up">W</button>
+          </div>
+        `).join("")}
       </div>
     </div>
   `;
@@ -496,32 +597,179 @@ function toggleSet(exIdx, setIdx) {
   const se = session.exercises[exIdx];
   se.done[setIdx] = !se.done[setIdx];
   Store.saveSession(session);
-  renderSession();
-  if (se.done[setIdx] && !se.done.every(Boolean)) startRestBanner();
+  if (se.done[setIdx] && !se.done.every(Boolean)) startRestTimer(App.restDuration);
+  else renderSession();
 }
 
-function startRestBanner() {
+function toggleSetWarmup(exIdx, setIdx) {
+  const db = Store.get();
+  const session = db.activeSession;
+  const se = session.exercises[exIdx];
+  if (!se.warmup) se.warmup = new Array(se.sets).fill(false);
+  se.warmup[setIdx] = !se.warmup[setIdx];
+  Store.saveSession(session);
+  renderSession();
+}
+
+const WARMUP_SUGGESTIONS = {
+  upper: ["Arm circles — 10 forward, 10 backward", "Shoulder rolls", "Wall slides or band pull-aparts", "A few slow incline push-ups"],
+  lower: ["Leg swings — front/back and side/side", "Bodyweight squats, slow and controlled", "Walking lunges", "Ankle circles"],
+  core: ["Cat-cow stretch", "Hip circles", "Standing side bends", "Bird-dog, slow and controlled"],
+  cardio: ["Light jogging in place — 1 minute", "Jumping jacks — 20 reps", "High knees — 20 reps"],
+};
+
+function warmupSuggestionsHTML(session) {
+  const categories = Array.from(new Set(session.exercises.map((se) => exerciseById(se.exerciseId).category)));
+  const moves = Array.from(new Set(categories.flatMap((c) => WARMUP_SUGGESTIONS[c] || [])));
+  if (!moves.length) return "";
+  return `
+    <details class="card warmup-suggestions" open>
+      <summary>Warm-Up Suggestions</summary>
+      <ol>${moves.map((m) => `<li>${m}</li>`).join("")}</ol>
+    </details>`;
+}
+
+// ---------- Rest Timer ----------
+
+const REST_PRESETS = [30, 60, 90, 120];
+
+function restModalHTML() {
+  if (App.restDone) {
+    return `
+      <div class="rest-modal-backdrop">
+        <div class="card rest-modal rest-modal-done">
+          <div class="rest-modal-icon">&check;</div>
+          <div class="rest-modal-headline">Rest Over!</div>
+          <button class="btn btn-primary btn-block" onclick="closeRestModal()">Continue</button>
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="rest-modal-backdrop">
+      <div class="card rest-modal">
+        <div class="eyebrow">Rest</div>
+        <div class="rest-modal-time" id="rest-modal-time">${formatBigTime(App.restRemaining)}</div>
+        <div class="rest-modal-presets">
+          ${REST_PRESETS.map((s) => `<button class="chip-toggle ${s === App.restDuration ? "on" : ""}" onclick="setRestDuration(${s})">${formatRestLabel(s)}</button>`).join("")}
+        </div>
+        <div class="rest-modal-adjust">
+          <button class="btn btn-secondary" onclick="adjustRest(-15)">&minus;15s</button>
+          <button class="btn btn-secondary" onclick="adjustRest(15)">+15s</button>
+        </div>
+        <button class="btn btn-secondary btn-block" onclick="skipRest()">Skip Rest</button>
+      </div>
+    </div>`;
+}
+
+function startRestTimer(seconds) {
   clearInterval(App.restTimer);
-  let secs = 30;
-  const banner = document.getElementById("rest-banner");
-  if (!banner) return;
-  const tick = () => {
-    if (!document.getElementById("rest-banner")) { clearInterval(App.restTimer); return; }
-    document.getElementById("rest-banner").innerHTML = secs > 0 ? `<div class="rest-banner">Rest — ${secs}s</div>` : "";
-    if (secs <= 0) clearInterval(App.restTimer);
-    secs--;
-  };
-  tick();
-  App.restTimer = setInterval(tick, 1000);
+  clearTimeout(App.restAutoCloseTimer);
+  App.restDuration = seconds;
+  App.restRemaining = seconds;
+  App.restActive = true;
+  App.restDone = false;
+  ensureAudioUnlocked();
+  renderSession();
+  App.restTimer = setInterval(restTick, 1000);
+}
+
+function restTick() {
+  const el = document.getElementById("rest-modal-time");
+  if (!el) { clearInterval(App.restTimer); return; }
+  App.restRemaining--;
+  if (App.restRemaining <= 0) {
+    clearInterval(App.restTimer);
+    App.restDone = true;
+    playRestAlert();
+    renderSession();
+    App.restAutoCloseTimer = setTimeout(closeRestModal, 3000);
+    return;
+  }
+  el.textContent = formatBigTime(App.restRemaining);
+}
+
+function setRestDuration(seconds) {
+  startRestTimer(seconds);
+}
+
+function adjustRest(delta) {
+  App.restRemaining = Math.max(5, App.restRemaining + delta);
+  const el = document.getElementById("rest-modal-time");
+  if (el) el.textContent = formatBigTime(App.restRemaining);
+}
+
+function skipRest() {
+  clearInterval(App.restTimer);
+  clearTimeout(App.restAutoCloseTimer);
+  App.restActive = false;
+  App.restDone = false;
+  renderSession();
+}
+
+function closeRestModal() {
+  clearTimeout(App.restAutoCloseTimer);
+  App.restActive = false;
+  App.restDone = false;
+  renderSession();
+}
+
+function formatBigTime(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function formatRestLabel(seconds) {
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s === 0 ? `${m}:00` : `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function ensureAudioUnlocked() {
+  try {
+    if (!App.audioCtx) App.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (App.audioCtx.state === "suspended") App.audioCtx.resume();
+  } catch (e) {}
+}
+
+function playRestAlert() {
+  try {
+    if (!App.audioCtx) App.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = App.audioCtx;
+    const beep = (delay) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + 0.25);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.3);
+    };
+    beep(0);
+    beep(0.35);
+  } catch (e) {}
+  if (navigator.vibrate) {
+    try { navigator.vibrate([200, 100, 200]); } catch (e) {}
+  }
 }
 
 function exitSession() {
   clearInterval(App.restTimer);
+  clearTimeout(App.restAutoCloseTimer);
+  App.restActive = false;
+  App.restDone = false;
   go("dashboard");
 }
 
 function finishWorkout() {
   clearInterval(App.restTimer);
+  clearTimeout(App.restAutoCloseTimer);
+  App.restActive = false;
+  App.restDone = false;
   const db = Store.get();
   const session = db.activeSession;
   const totalSets = session.exercises.reduce((s, e) => s + e.sets, 0);
@@ -531,10 +779,233 @@ function finishWorkout() {
   Store.completeWorkout({
     date: todayISO(),
     dayIndex: session.dayIndex,
-    exerciseResults: session.exercises.map((e) => ({ exerciseId: e.exerciseId, setsDone: e.done.filter(Boolean).length, setsPrescribed: e.sets })),
+    exerciseResults: session.exercises.map((e) => {
+      const warmup = e.warmup || new Array(e.sets).fill(false);
+      return {
+        exerciseId: e.exerciseId,
+        setsDone: e.done.filter(Boolean).length,
+        setsPrescribed: e.sets,
+        reps: e.reps,
+        warmupSetsDone: e.done.filter((d, idx) => d && warmup[idx]).length,
+      };
+    }),
     durationMin, completionPct,
   });
   go("dashboard");
+}
+
+// ---------- Workout Templates ----------
+
+function renderTemplates() {
+  App.root.innerHTML = `<div class="screen" id="screen"></div>`;
+  const screen = document.getElementById("screen");
+  if (App.templateEditing) renderTemplateEditor(screen);
+  else renderTemplateList(screen);
+}
+
+function renderTemplateList(screen) {
+  const templates = Store.getTemplates();
+  screen.innerHTML = `
+    <div class="tmpl-head">
+      <button class="btn-icon" onclick="go('dashboard')">&larr;</button>
+      <h1>Templates</h1>
+      <button class="btn-icon" onclick="newTemplateDraft()">+</button>
+    </div>
+    ${templates.length ? templates.map(templateCardHTML).join("") : `
+      <div class="card"><p class="muted">No templates yet — create one to quick-load your favorite combos.</p></div>
+    `}
+  `;
+}
+
+function templateCardHTML(t) {
+  return `
+    <div class="card">
+      <h3 class="tmpl-name">${escapeHtml(t.name)}</h3>
+      <div class="chip-row">${t.exercises.map((ex) => `<span class="chip">${exerciseById(ex.exerciseId).name}</span>`).join("")}</div>
+      <div class="row2">
+        <button class="btn btn-secondary" onclick="editTemplate('${t.id}')">Edit</button>
+        <button class="btn btn-primary" onclick="startWorkoutFromTemplate('${t.id}')">Start</button>
+      </div>
+      <button class="btn btn-danger btn-block" onclick="deleteTemplateConfirm('${t.id}')">Delete</button>
+    </div>`;
+}
+
+function newTemplateDraft() {
+  App.templateEditing = { id: crypto.randomUUID(), name: "", exercises: [], isNew: true };
+  App.templatePickerOpen = false;
+  App.templatePickerCat = "all";
+  renderTemplates();
+}
+
+function editTemplate(id) {
+  const t = Store.getTemplates().find((t) => t.id === id);
+  if (!t) return;
+  App.templateEditing = { ...t, exercises: t.exercises.map((e) => ({ ...e })) };
+  App.templatePickerOpen = false;
+  App.templatePickerCat = "all";
+  renderTemplates();
+}
+
+function cancelTemplateEdit() {
+  App.templateEditing = null;
+  App.templatePickerOpen = false;
+  renderTemplates();
+}
+
+function deleteTemplateConfirm(id) {
+  if (confirm("Delete this template?")) {
+    Store.deleteTemplate(id);
+    renderTemplates();
+  }
+}
+
+function renderTemplateEditor(screen) {
+  const draft = App.templateEditing;
+  screen.innerHTML = `
+    <div class="tmpl-head">
+      <button class="btn-icon" onclick="cancelTemplateEdit()">&larr;</button>
+      <h1>${draft.isNew ? "New Template" : "Edit Template"}</h1>
+      <span></span>
+    </div>
+
+    <label class="field-label">Name</label>
+    <input class="input" id="tmpl-name" type="text" placeholder="e.g. Push Day" value="${escapeHtml(draft.name)}">
+
+    <div class="tmpl-ex-list">
+      ${draft.exercises.length ? draft.exercises.map((ex, i) => tmplExerciseRowHTML(ex, i, draft.exercises.length)).join("") : `<p class="muted">No exercises added yet.</p>`}
+    </div>
+
+    <button class="btn btn-secondary btn-block" id="tmpl-add-btn">${App.templatePickerOpen ? "Close Picker" : "+ Add Exercise"}</button>
+    ${App.templatePickerOpen ? templatePickerHTML(draft) : ""}
+
+    <div class="auth-error" id="tmpl-error"></div>
+    <button class="btn btn-primary btn-block" id="tmpl-save-btn">Save Template</button>
+  `;
+  bindTemplateEditorEvents(screen);
+}
+
+function tmplExerciseRowHTML(ex, i, total) {
+  const meta = exerciseById(ex.exerciseId);
+  return `
+    <div class="card tmpl-ex-row">
+      <div class="tmpl-ex-row-move">
+        <button class="btn-icon tmpl-move-btn" ${i === 0 ? "disabled" : ""} onclick="moveDraftExercise(${i}, -1)">&#9650;</button>
+        <button class="btn-icon tmpl-move-btn" ${i === total - 1 ? "disabled" : ""} onclick="moveDraftExercise(${i}, 1)">&#9660;</button>
+      </div>
+      <div class="tmpl-ex-row-name">${meta.name}</div>
+      <div class="tmpl-ex-row-fields">
+        <input class="input" type="number" min="1" value="${ex.sets}" onchange="updateDraftExerciseField(${i}, 'sets', this.value)">
+        <span class="muted">sets</span>
+        <input class="input" type="number" min="1" value="${ex.reps}" onchange="updateDraftExerciseField(${i}, 'reps', this.value)">
+        <span class="muted">${meta.isHold ? "sec" : "reps"}</span>
+      </div>
+      <button class="btn-icon" onclick="removeExerciseFromDraft(${i})">&times;</button>
+    </div>`;
+}
+
+function moveDraftExercise(i, direction) {
+  const exercises = App.templateEditing.exercises;
+  const j = i + direction;
+  if (j < 0 || j >= exercises.length) return;
+  [exercises[i], exercises[j]] = [exercises[j], exercises[i]];
+  renderTemplates();
+}
+
+function templatePickerHTML(draft) {
+  const cat = App.templatePickerCat || "all";
+  const usedIds = new Set(draft.exercises.map((e) => e.exerciseId));
+  const items = cat === "all" ? EXERCISES : EXERCISES.filter((e) => e.category === cat);
+  return `
+    <div class="chip-filter" id="tmpl-picker-filter">
+      ${["all", "upper", "lower", "core", "cardio"].map((c) => `<button class="chip-toggle ${c === cat ? "on" : ""}" data-cat="${c}">${c === "all" ? "All" : CATEGORY_LABELS[c]}</button>`).join("")}
+    </div>
+    <div class="lib-list">
+      ${items.map((ex) => `
+        <div class="card lib-item tmpl-picker-item ${usedIds.has(ex.id) ? "added" : ""}" data-ex="${ex.id}">
+          <div class="ex-pose small">${POSES[ex.pose]}</div>
+          <div class="lib-item-body">
+            <h3>${ex.name}</h3>
+            <p class="muted">${CATEGORY_LABELS[ex.category]}</p>
+          </div>
+          ${usedIds.has(ex.id) ? `<span class="muted small">Added</span>` : ""}
+        </div>`).join("")}
+    </div>
+  `;
+}
+
+function bindTemplateEditorEvents(screen) {
+  const nameInput = document.getElementById("tmpl-name");
+  nameInput.addEventListener("input", () => { App.templateEditing.name = nameInput.value; });
+
+  document.getElementById("tmpl-add-btn").addEventListener("click", () => {
+    App.templatePickerOpen = !App.templatePickerOpen;
+    renderTemplates();
+  });
+
+  document.getElementById("tmpl-save-btn").addEventListener("click", saveTemplateDraft);
+
+  const filterBar = document.getElementById("tmpl-picker-filter");
+  if (filterBar) {
+    filterBar.querySelectorAll(".chip-toggle").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        App.templatePickerCat = btn.dataset.cat;
+        renderTemplates();
+      });
+    });
+  }
+
+  screen.querySelectorAll(".tmpl-picker-item:not(.added)").forEach((item) => {
+    item.addEventListener("click", () => addExerciseToDraft(item.dataset.ex));
+  });
+}
+
+function addExerciseToDraft(exerciseId) {
+  const ex = exerciseById(exerciseId);
+  const profile = Store.getProfile();
+  const { sets, reps } = scaleFor(ex, profile);
+  App.templateEditing.exercises.push({ exerciseId, sets, reps });
+  renderTemplates();
+}
+
+function removeExerciseFromDraft(i) {
+  App.templateEditing.exercises.splice(i, 1);
+  renderTemplates();
+}
+
+function updateDraftExerciseField(i, field, value) {
+  App.templateEditing.exercises[i][field] = Math.max(1, Number(value) || 1);
+}
+
+function saveTemplateDraft() {
+  const draft = App.templateEditing;
+  const errBox = document.getElementById("tmpl-error");
+  const name = (document.getElementById("tmpl-name").value || "").trim();
+  if (!name) { errBox.textContent = "Give this template a name."; return; }
+  if (!draft.exercises.length) { errBox.textContent = "Add at least one exercise."; return; }
+  const now = new Date().toISOString();
+  Store.saveTemplate({
+    id: draft.id,
+    name,
+    exercises: draft.exercises,
+    createdAt: draft.createdAt || now,
+    updatedAt: now,
+  });
+  App.templateEditing = null;
+  App.templatePickerOpen = false;
+  renderTemplates();
+}
+
+function startWorkoutFromTemplate(templateId) {
+  const template = Store.getTemplates().find((t) => t.id === templateId);
+  if (!template) return;
+  const session = {
+    dayIndex: null,
+    templateId: template.id,
+    startedAt: Date.now(),
+    exercises: template.exercises.map((ex) => ({ exerciseId: ex.exerciseId, sets: ex.sets, reps: ex.reps, done: new Array(ex.sets).fill(false), warmup: new Array(ex.sets).fill(false) })),
+  };
+  Store.saveSession(session);
+  go("session");
 }
 
 // ---------- Library ----------
@@ -555,13 +1026,14 @@ function renderLibrary(screen) {
     if (cat === "safe") items = items.filter((e) => safeForProfile(e, profile));
     else if (cat !== "all") items = items.filter((e) => e.category === cat);
     list.innerHTML = items.map((ex) => `
-      <div class="card lib-item">
+      <div class="card lib-item" onclick="viewExerciseHistory('${ex.id}')">
         <div class="ex-pose small">${POSES[ex.pose]}</div>
         <div class="lib-item-body">
           <h3>${ex.name}</h3>
           <p class="muted">${CATEGORY_LABELS[ex.category]} · targets ${(ex.targets || []).map((t) => PROBLEM_AREA_LABELS[t] || t).join(", ")}</p>
           ${ex.avoidInjuries.length ? `<p class="muted small">Avoid if: ${ex.avoidInjuries.map((a) => INJURY_LABELS[a]).join(", ")}</p>` : ""}
         </div>
+        <span class="lib-item-chevron">&rsaquo;</span>
       </div>`).join("");
   }
   filterBar.querySelectorAll(".chip-toggle").forEach((btn) => {
@@ -574,7 +1046,311 @@ function renderLibrary(screen) {
   draw("all");
 }
 
+// ---------- Exercise History ----------
+
+function viewExerciseHistory(exerciseId) {
+  App.historyExerciseId = exerciseId;
+  go("exercise-history");
+}
+
+function exerciseHistoryFor(exerciseId) {
+  const db = Store.get();
+  const entries = [];
+  for (const w of db.workoutHistory) {
+    const r = (w.exerciseResults || []).find((e) => e.exerciseId === exerciseId);
+    if (r) {
+      const warmupSetsDone = r.warmupSetsDone || 0;
+      entries.push({
+        date: w.date,
+        setsDone: r.setsDone,
+        setsPrescribed: r.setsPrescribed,
+        reps: r.reps != null ? r.reps : null,
+        warmupSetsDone,
+        workingSets: Math.max(0, r.setsDone - warmupSetsDone),
+      });
+    }
+  }
+  entries.sort((a, b) => a.date.localeCompare(b.date));
+  return entries;
+}
+
+// Warm-up-only entries (every completed set flagged as warm-up) don't count toward PRs —
+// they're not a real working performance for this exercise.
+function exercisePRs(entries) {
+  const working = entries.filter((e) => e.workingSets > 0);
+  if (!working.length) return null;
+  let bestReps = 0, bestSets = 0;
+  for (const e of working) {
+    if (e.reps != null && e.reps > bestReps) bestReps = e.reps;
+    if (e.workingSets > bestSets) bestSets = e.workingSets;
+  }
+  const last = working[working.length - 1];
+  return { bestReps, bestSets, timesPerformed: working.length, last };
+}
+
+function renderExerciseHistory() {
+  App.root.innerHTML = `<div class="screen" id="screen"></div>`;
+  const screen = document.getElementById("screen");
+  const ex = exerciseById(App.historyExerciseId);
+  if (!ex) { go("library"); return; }
+
+  const entries = exerciseHistoryFor(ex.id);
+  const pr = exercisePRs(entries);
+  const unit = ex.isHold ? "s" : " reps";
+
+  screen.innerHTML = `
+    <div class="tmpl-head">
+      <button class="btn-icon" onclick="go('library')">&larr;</button>
+      <h1>${ex.name}</h1>
+      <span></span>
+    </div>
+
+    <div class="card ex-history-summary">
+      <div class="ex-pose ex-history-pose">${POSES[ex.pose]}</div>
+      <p class="muted">${CATEGORY_LABELS[ex.category]} · targets ${(ex.targets || []).map((t) => PROBLEM_AREA_LABELS[t] || t).join(", ")}</p>
+    </div>
+
+    ${pr ? `
+      <div class="stat-row">
+        <div class="stat-tile"><span class="stat-num">${pr.bestReps || "—"}</span><span class="stat-label">Best ${ex.isHold ? "Hold (s)" : "Reps"}</span></div>
+        <div class="stat-tile"><span class="stat-num">${pr.bestSets}</span><span class="stat-label">Best Sets</span></div>
+        <div class="stat-tile"><span class="stat-num">${pr.timesPerformed}</span><span class="stat-label">Times Done</span></div>
+      </div>
+
+      <div class="card">
+        <div class="eyebrow">${ex.isHold ? "Hold Time" : "Reps"} Over Time</div>
+        <canvas id="chart-ex-history" class="chart"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="eyebrow">History</div>
+        ${entries.slice().reverse().map((e) => `
+          <div class="history-row">
+            <span>${e.date}</span>
+            <span>${e.setsDone}/${e.setsPrescribed} sets${e.warmupSetsDone ? ` (${e.warmupSetsDone} warmup)` : ""}</span>
+            <span>${e.reps != null ? e.reps + unit : "—"}</span>
+          </div>
+        `).join("")}
+      </div>
+    ` : `
+      <div class="card"><p class="muted">You haven't logged this exercise yet — complete a workout that includes it to start tracking your performance here.</p></div>
+    `}
+  `;
+
+  if (pr) {
+    const points = entries.filter((e) => e.workingSets > 0 && e.reps != null).map((e) => ({ y: e.reps }));
+    drawLineChart(document.getElementById("chart-ex-history"), points, { emptyText: "Not enough data yet", minY: 0 });
+  }
+}
+
 // ---------- Analytics ----------
+
+function allExercisesWithHistory() {
+  const db = Store.get();
+  const ids = new Set();
+  for (const w of db.workoutHistory) {
+    for (const r of w.exerciseResults || []) ids.add(r.exerciseId);
+  }
+  return Array.from(ids).map((id) => exerciseById(id)).filter(Boolean);
+}
+
+const MUSCLE_GROUP_SHORT_LABELS = {
+  belly_fat: "Belly", love_handles: "Obliques", chest: "Chest", arms: "Arms",
+  thighs: "Thighs", back: "Back", glutes: "Glutes",
+};
+
+// An exercise counts toward every muscle group it targets (matching how `targets` is already
+// used for problem-area prioritization in workout-generator.js), using only working sets.
+function weeklyVolumeByMuscleGroup(workoutHistory) {
+  const startISO = weekStartISO();
+  const totals = {};
+  Object.keys(PROBLEM_AREA_LABELS).forEach((k) => { totals[k] = 0; });
+  for (const w of workoutHistory) {
+    if (w.date < startISO) continue;
+    for (const r of w.exerciseResults || []) {
+      const ex = exerciseById(r.exerciseId);
+      if (!ex) continue;
+      const workingSets = Math.max(0, r.setsDone - (r.warmupSetsDone || 0));
+      const volume = workingSets * (r.reps || 0);
+      for (const t of ex.targets || []) {
+        if (totals[t] != null) totals[t] += volume;
+      }
+    }
+  }
+  return totals;
+}
+
+function volumeByWeekday(workoutHistory) {
+  const totals = new Array(7).fill(0); // 0=Sun..6=Sat
+  for (const w of workoutHistory) {
+    const day = new Date(w.date + "T00:00:00").getDay();
+    for (const r of w.exerciseResults || []) {
+      const workingSets = Math.max(0, r.setsDone - (r.warmupSetsDone || 0));
+      totals[day] += workingSets * (r.reps || 0);
+    }
+  }
+  return totals;
+}
+
+function exportDataCSV() {
+  const db = Store.get();
+  const header = ["Date", "Type", "Exercise", "Category", "SetsDone", "SetsPrescribed", "RepsOrHold", "WarmupSets", "WeightKg", "Pushups", "Pullups", "DurationMin", "CompletionPct"];
+  const rows = [];
+
+  for (const w of db.workoutHistory) {
+    for (const r of w.exerciseResults || []) {
+      const ex = exerciseById(r.exerciseId);
+      rows.push([
+        w.date, "Workout", ex ? ex.name : r.exerciseId, ex ? CATEGORY_LABELS[ex.category] : "",
+        r.setsDone, r.setsPrescribed, r.reps != null ? r.reps : "", r.warmupSetsDone || 0,
+        "", "", "", w.durationMin, w.completionPct,
+      ]);
+    }
+  }
+  for (const w of db.weightLog) {
+    rows.push([w.date, "BodyWeight", "", "", "", "", "", "", w.weightKg, "", "", "", ""]);
+  }
+  for (const t of db.testLog) {
+    rows.push([t.date, "StrengthTest", "", "", "", "", "", "", "", t.pushups, t.pullups, "", ""]);
+  }
+  rows.sort((a, b) => a[0].localeCompare(b[0]));
+
+  const csvEscape = (v) => {
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tacfit-export-${todayISO()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// ---------- Progress Photos ----------
+// Requires an account — the image bytes need somewhere durable to live, and this app has no
+// offline blob store. Degrades to an explanatory message when signed out.
+
+function progressPhotosHTML() {
+  if (typeof Auth === "undefined" || !Auth.isAvailable() || !App.user) {
+    return `
+      <div class="card">
+        <div class="eyebrow">Progress Photos</div>
+        <p class="muted">Sign in (see Profile) to add and sync progress photos across devices.</p>
+      </div>`;
+  }
+  const photos = Store.getProgressPhotos();
+  return `
+    <div class="card">
+      <div class="eyebrow">Progress Photos</div>
+      <input type="file" accept="image/*" id="photo-input" style="display:none">
+      <button class="btn btn-secondary btn-block" id="add-photo-btn">Add Photo</button>
+      <div class="auth-error" id="photo-error"></div>
+      <div class="photo-gallery">
+        ${photos.length ? photos.slice().reverse().map((p) => `
+          <div class="photo-thumb" id="thumb-${p.id}" onclick="viewProgressPhoto('${p.id}')">
+            <span class="photo-thumb-date">${p.date}</span>
+          </div>`).join("") : `<p class="muted">No photos yet.</p>`}
+      </div>
+    </div>
+    ${App.photoLightboxId ? photoLightboxHTML() : ""}`;
+}
+
+function bindProgressPhotoEvents(screen) {
+  const addBtn = document.getElementById("add-photo-btn");
+  const input = document.getElementById("photo-input");
+  if (addBtn && input) {
+    addBtn.addEventListener("click", () => input.click());
+    input.addEventListener("change", () => handlePhotoUpload(input.files[0], screen));
+  }
+  Store.getProgressPhotos().forEach(loadPhotoThumb);
+}
+
+async function loadPhotoThumb(photo) {
+  if (!supabaseClient) return;
+  const el = document.getElementById(`thumb-${photo.id}`);
+  if (!el) return;
+  const { data, error } = await supabaseClient.storage.from("progress-photos").createSignedUrl(photo.storagePath, 3600);
+  if (error || !data) return;
+  el.style.backgroundImage = `url("${data.signedUrl}")`;
+}
+
+async function handlePhotoUpload(file, screen) {
+  if (!file) return;
+  const errBox = document.getElementById("photo-error");
+  if (errBox) errBox.textContent = "";
+  try {
+    const uid = App.user.id;
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `${uid}/${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabaseClient.storage.from("progress-photos").upload(path, file);
+    if (error) throw error;
+    Store.addProgressPhoto({ id: crypto.randomUUID(), date: todayISO(), storagePath: path, createdAt: new Date().toISOString() });
+    renderAnalytics(screen);
+  } catch (e) {
+    if (errBox) errBox.textContent = e.message || "Upload failed.";
+  }
+}
+
+function viewProgressPhoto(id) {
+  App.photoLightboxId = id;
+  App.photoLightboxUrl = null;
+  renderAnalytics(document.getElementById("screen"));
+  loadLightboxUrl(id);
+}
+
+async function loadLightboxUrl(id) {
+  const photo = Store.getProgressPhotos().find((p) => p.id === id);
+  if (!photo || !supabaseClient) return;
+  const { data, error } = await supabaseClient.storage.from("progress-photos").createSignedUrl(photo.storagePath, 3600);
+  if (App.photoLightboxId !== id || error || !data) return;
+  App.photoLightboxUrl = data.signedUrl;
+  const img = document.getElementById("photo-lightbox-img");
+  if (img) img.src = App.photoLightboxUrl;
+}
+
+function closePhotoLightbox() {
+  App.photoLightboxId = null;
+  App.photoLightboxUrl = null;
+  renderAnalytics(document.getElementById("screen"));
+}
+
+function photoLightboxHTML() {
+  const photo = Store.getProgressPhotos().find((p) => p.id === App.photoLightboxId);
+  if (!photo) return "";
+  return `
+    <div class="rest-modal-backdrop">
+      <div class="card rest-modal photo-lightbox-card">
+        ${App.photoLightboxUrl ? `<img id="photo-lightbox-img" src="${App.photoLightboxUrl}" class="photo-lightbox-img" alt="Progress photo ${photo.date}">` : `<p class="muted">Loading…</p>`}
+        <p class="muted">${photo.date}</p>
+        <div class="row2">
+          <button class="btn btn-danger" onclick="deleteProgressPhotoConfirm('${photo.id}')">Delete</button>
+          <button class="btn btn-primary" onclick="closePhotoLightbox()">Close</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function deleteProgressPhotoConfirm(id) {
+  if (!confirm("Delete this photo?")) return;
+  const photo = Store.getProgressPhotos().find((p) => p.id === id);
+  if (photo) await deleteProgressPhotoRemote(photo);
+  Store.deleteProgressPhoto(id);
+  closePhotoLightbox();
+}
+
+async function deleteProgressPhotoRemote(photo) {
+  if (!supabaseClient || !App.user) return;
+  try {
+    await supabaseClient.storage.from("progress-photos").remove([photo.storagePath]);
+    await supabaseClient.from("progress_photos").delete().eq("id", photo.id);
+  } catch (e) {}
+}
 
 function renderAnalytics(screen) {
   const db = Store.get();
@@ -584,8 +1360,24 @@ function renderAnalytics(screen) {
   const latest = latestTest(db);
   const fit = fitnessScore(latest.pushups, latest.pullups);
 
+  const strengthGains = allExercisesWithHistory()
+    .map((ex) => {
+      const entries = exerciseHistoryFor(ex.id);
+      const pr = exercisePRs(entries);
+      return pr ? { ex, entries, pr } : null;
+    })
+    .filter(Boolean);
+
+  const muscleVolume = weeklyVolumeByMuscleGroup(db.workoutHistory);
+  const weekdayVolume = volumeByWeekday(db.workoutHistory);
+  const maxWeekdayVolume = Math.max(1, ...weekdayVolume);
+  const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
   screen.innerHTML = `
-    <div class="header"><h1>Progress</h1></div>
+    <div class="header header-with-action">
+      <h1>Progress</h1>
+      <button class="btn btn-secondary" id="export-csv-btn">Export CSV</button>
+    </div>
 
     <div class="card">
       <div class="eyebrow">Weight Trend</div>
@@ -614,9 +1406,44 @@ function renderAnalytics(screen) {
     </div>
 
     <div class="card">
+      <div class="eyebrow">Strength Gains</div>
+      ${strengthGains.length ? strengthGains.map(({ ex, pr }) => `
+        <div class="sgain-row" onclick="viewExerciseHistory('${ex.id}')">
+          <div class="sgain-info">
+            <h3>${ex.name}</h3>
+            <p class="muted">${pr.bestReps}${ex.isHold ? "s" : " reps"} best · ${pr.timesPerformed}× done</p>
+          </div>
+          <canvas class="sgain-spark" id="spark-${ex.id}"></canvas>
+        </div>
+      `).join("") : `<p class="muted">Complete workouts to start seeing strength trends here.</p>`}
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Weekly Volume by Muscle Group</div>
+      <canvas id="chart-muscle-volume" class="chart"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Training Volume by Day of Week</div>
+      <div class="weekday-heatmap">
+        ${WEEKDAY_LABELS.map((label, i) => {
+          const v = weekdayVolume[i];
+          const intensity = v > 0 ? Math.round((0.15 + 0.85 * (v / maxWeekdayVolume)) * 100) : 0;
+          return `
+            <div class="weekday-tile" style="background: color-mix(in srgb, var(--accent) ${intensity}%, var(--surface-2));">
+              <span class="weekday-tile-label">${label}</span>
+              <span class="weekday-tile-value">${v}</span>
+            </div>`;
+        }).join("")}
+      </div>
+    </div>
+
+    <div class="card">
       <div class="eyebrow">Workout Frequency — Current vs Prescribed</div>
       <canvas id="chart-freq" class="chart"></canvas>
     </div>
+
+    ${progressPhotosHTML()}
 
     <div class="card">
       <div class="eyebrow">Recent Workouts</div>
@@ -632,6 +1459,16 @@ function renderAnalytics(screen) {
   const strengthCanvas = document.getElementById("chart-strength");
   const pushPoints = db.testLog.map((t) => ({ y: t.pushups }));
   drawLineChart(strengthCanvas, pushPoints, { emptyText: "No strength tests yet", minY: 0 });
+
+  strengthGains.forEach(({ ex, entries }) => {
+    const points = entries.filter((e) => e.workingSets > 0 && e.reps != null).map((e) => ({ y: e.reps }));
+    const canvas = document.getElementById(`spark-${ex.id}`);
+    if (canvas) drawLineChart(canvas, points, { emptyText: "", minY: 0 });
+  });
+
+  drawBarChart(document.getElementById("chart-muscle-volume"), Object.keys(PROBLEM_AREA_LABELS).map((k) => ({
+    label: MUSCLE_GROUP_SHORT_LABELS[k] || k, v: muscleVolume[k],
+  })));
 
   drawBarChart(document.getElementById("chart-freq"), [
     { label: "Current", v: profile.currentFrequency || 0 },
@@ -654,6 +1491,10 @@ function renderAnalytics(screen) {
       renderAnalytics(screen);
     });
   });
+
+  document.getElementById("export-csv-btn").addEventListener("click", exportDataCSV);
+
+  bindProgressPhotoEvents(screen);
 }
 
 // ---------- Settings ----------
@@ -662,6 +1503,9 @@ function renderSettings(screen) {
   const profile = Store.getProfile();
   screen.innerHTML = `
     <div class="header"><h1>Profile & Settings</h1></div>
+
+    ${accountCardHTML()}
+
     <div class="card">
       <div class="review-grid">
         <div class="review-item"><span>Name</span><b>${escapeHtml(profile.name) || "—"}</b></div>
@@ -693,6 +1537,7 @@ function renderSettings(screen) {
     const kg = profile.units === "metric" ? raw : lbToKg(raw);
     Store.logWeight(kg);
     profile.weightKg = kg;
+    profile.updatedAt = todayISO();
     Store.saveProfile(profile);
     renderSettings(screen);
   });
@@ -703,6 +1548,93 @@ function renderSettings(screen) {
       go("onboarding");
     }
   });
+  bindAccountCardEvents(screen);
+}
+
+// ---------- Account (optional sign-in / sync) ----------
+
+function accountCardHTML() {
+  if (typeof Auth === "undefined" || !Auth.isAvailable()) {
+    return `
+      <div class="card">
+        <div class="eyebrow">Account</div>
+        <p class="muted">Sign-in isn't configured for this install — your data stays on this device only.</p>
+      </div>`;
+  }
+  if (App.user) {
+    return `
+      <div class="card">
+        <div class="eyebrow">Account</div>
+        <p>${escapeHtml(App.user.email)} <span class="tag sync-tag-${Sync.status}">${syncStatusLabel(Sync.status)}</span></p>
+        <button class="btn btn-secondary btn-block" id="signout-btn">Sign Out</button>
+      </div>`;
+  }
+  return `
+    <div class="card">
+      <div class="eyebrow">Account</div>
+      <p class="muted">Optional — sign in to sync your data across devices. The app fully works offline without one.</p>
+      <div class="oauth-row">
+        <button class="btn btn-secondary btn-block" id="oauth-google-btn">Continue with Google</button>
+        <button class="btn btn-secondary btn-block" id="oauth-github-btn">Continue with GitHub</button>
+      </div>
+      <div class="auth-divider"><span>or use email</span></div>
+      <input class="input" id="auth-email" type="email" placeholder="Email" autocomplete="email">
+      <label class="field-label">Password</label>
+      <input class="input" id="auth-password" type="password" placeholder="At least 6 characters" autocomplete="current-password">
+      <div class="auth-error" id="auth-error"></div>
+      <div class="row2">
+        <button class="btn btn-secondary" id="signup-btn">Sign Up</button>
+        <button class="btn btn-primary" id="signin-btn">Log In</button>
+      </div>
+    </div>`;
+}
+
+function syncStatusLabel(status) {
+  return { idle: "Synced", syncing: "Syncing…", "offline-queued": "Offline", error: "Sync error" }[status] || "";
+}
+
+function bindAccountCardEvents(screen) {
+  const signOutBtn = document.getElementById("signout-btn");
+  if (signOutBtn) {
+    signOutBtn.addEventListener("click", async () => {
+      await Auth.signOut();
+      renderSettings(screen);
+    });
+  }
+  const signUpBtn = document.getElementById("signup-btn");
+  const signInBtn = document.getElementById("signin-btn");
+  if (signUpBtn) signUpBtn.addEventListener("click", () => handleAuthSubmit(screen, "signUp"));
+  if (signInBtn) signInBtn.addEventListener("click", () => handleAuthSubmit(screen, "signIn"));
+
+  const googleBtn = document.getElementById("oauth-google-btn");
+  const githubBtn = document.getElementById("oauth-github-btn");
+  if (googleBtn) googleBtn.addEventListener("click", () => handleOAuthClick("google"));
+  if (githubBtn) githubBtn.addEventListener("click", () => handleOAuthClick("github"));
+}
+
+async function handleOAuthClick(provider) {
+  const errBox = document.getElementById("auth-error");
+  if (errBox) errBox.textContent = "";
+  const result = await Auth.signInWithProvider(provider);
+  // On success the browser navigates away to the provider — nothing else to render here.
+  if (result.error && errBox) errBox.textContent = result.error;
+}
+
+async function handleAuthSubmit(screen, method) {
+  const email = document.getElementById("auth-email").value.trim();
+  const password = document.getElementById("auth-password").value;
+  const errBox = document.getElementById("auth-error");
+  errBox.textContent = "";
+  if (!email || password.length < 6) {
+    errBox.textContent = "Enter an email and a password of at least 6 characters.";
+    return;
+  }
+  const result = await Auth[method](email, password);
+  if (result.error) {
+    errBox.textContent = result.error;
+    return;
+  }
+  renderSettings(screen);
 }
 
 function editProfile() {

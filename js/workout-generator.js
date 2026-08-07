@@ -128,5 +128,9 @@ function getNextPlanDay(plan, workoutHistory) {
 }
 
 function exerciseById(id) {
-  return EXERCISES.find((e) => e.id === id);
+  return EXERCISES.find((e) => e.id === id) || Store.getCustomExercises().find((e) => e.id === id);
+}
+
+function allExercisesIncludingCustom() {
+  return EXERCISES.concat(Store.getCustomExercises());
 }

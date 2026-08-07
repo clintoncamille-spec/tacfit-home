@@ -1,0 +1,425 @@
+<meta charset="utf-8">
+<title>TacFit Home — Dashboard Concept</title>
+<style>
+  :root {
+    --bg: #eef0f8;
+    --stage-bg: #e4e7f3;
+    --surface: #ffffff;
+    --surface-2: #f4f5fb;
+    --text: #1e2333;
+    --text-dim: #676e8a;
+    --text-faint: #9599b3;
+    --accent: #6366f1;
+    --accent-2: #818cf8;
+    --accent-ink: #ffffff;
+    --border: #e5e7f4;
+    --good: #059669;
+    --good-tint: #d1fae5;
+    --warn: #d97706;
+    --warn-tint: #fef3c7;
+    --shadow-sm: 0 1px 2px rgba(30, 35, 51, 0.05), 0 1px 3px rgba(30, 35, 51, 0.06);
+    --shadow-md: 0 8px 24px rgba(30, 35, 51, 0.10);
+    --chassis-1: #3a3d4a;
+    --chassis-2: #202230;
+    --stroke: 1.75;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0d16; --stage-bg: #08090f; --surface: #17192a; --surface-2: #1e2136;
+      --text: #eef0fa; --text-dim: #9a9fc0; --text-faint: #666b8c;
+      --accent: #818cf8; --accent-2: #6366f1; --accent-ink: #0c0d16;
+      --border: #2a2d47; --good: #34d399; --good-tint: #0d3327; --warn: #fbbf24; --warn-tint: #3a2a08;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.4); --shadow-md: 0 12px 28px rgba(0,0,0,0.45);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0c0d16; --stage-bg: #08090f; --surface: #17192a; --surface-2: #1e2136;
+    --text: #eef0fa; --text-dim: #9a9fc0; --text-faint: #666b8c;
+    --accent: #818cf8; --accent-2: #6366f1; --accent-ink: #0c0d16;
+    --border: #2a2d47; --good: #34d399; --good-tint: #0d3327; --warn: #fbbf24; --warn-tint: #3a2a08;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.4); --shadow-md: 0 12px 28px rgba(0,0,0,0.45);
+  }
+  :root[data-theme="light"] {
+    --bg: #eef0f8; --stage-bg: #e4e7f3; --surface: #ffffff; --surface-2: #f4f5fb;
+    --text: #1e2333; --text-dim: #676e8a; --text-faint: #9599b3;
+    --accent: #6366f1; --accent-2: #818cf8; --accent-ink: #ffffff;
+    --border: #e5e7f4; --good: #059669; --good-tint: #d1fae5; --warn: #d97706; --warn-tint: #fef3c7;
+    --shadow-sm: 0 1px 2px rgba(30,35,51,0.05), 0 1px 3px rgba(30,35,51,0.06); --shadow-md: 0 8px 24px rgba(30,35,51,0.10);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--stage-bg);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+    color: var(--text);
+  }
+  button, input { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; } }
+
+  svg.icon { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: var(--stroke); stroke-linecap: round; stroke-linejoin: round; display: block; }
+
+  .stage {
+    display: grid;
+    grid-template-columns: minmax(0, 430px) minmax(280px, 360px);
+    justify-content: center;
+    gap: 48px;
+    padding: 56px 24px 72px;
+    max-width: 1100px;
+    margin: 0 auto;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .stage { grid-template-columns: minmax(0, 430px); justify-items: center; }
+    .phone-wrap { position: static; }
+  }
+
+  /* ---------- Device frame ---------- */
+  .phone-wrap { position: sticky; top: 40px; }
+  .phone {
+    width: 390px;
+    max-width: 100%;
+    border-radius: 54px;
+    padding: 14px;
+    background: linear-gradient(160deg, var(--chassis-1), var(--chassis-2));
+    box-shadow: var(--shadow-md);
+  }
+  .screen {
+    background: var(--bg);
+    border-radius: 42px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 844px;
+  }
+
+  .statusbar {
+    flex: none;
+    height: 47px;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 0 26px 8px;
+    font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .statusbar .glyphs { display: flex; align-items: center; gap: 5px; }
+  .statusbar svg.icon { width: 17px; height: 17px; }
+
+  .content { flex: 1; overflow-y: auto; padding: 4px 20px 100px; scrollbar-width: none; }
+  .content::-webkit-scrollbar { display: none; }
+
+  .navhead { padding: 10px 2px 18px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .navhead h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 0; text-wrap: balance; line-height: 1.1; }
+  .navhead .date { margin: 3px 0 0; font-size: 14px; color: var(--text-dim); font-weight: 500; }
+  .avatar-btn {
+    width: 38px; height: 38px; border-radius: 50%; border: none; flex: none;
+    background: var(--surface-2); color: var(--text-dim); display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--shadow-sm);
+  }
+  .avatar-btn svg.icon { width: 19px; height: 19px; }
+
+  .section-label {
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--text-faint); margin: 22px 2px 10px;
+  }
+  .section-label:first-child { margin-top: 0; }
+
+  /* ---------- Quick actions ---------- */
+  .quick-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .qa-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    background: var(--surface); border: none; border-radius: 18px; padding: 14px 4px 12px;
+    box-shadow: var(--shadow-sm); color: var(--text); transition: transform 0.15s ease;
+  }
+  .qa-btn:active { transform: scale(0.95); }
+  .qa-icon {
+    width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--accent);
+  }
+  .qa-icon svg.icon { width: 19px; height: 19px; }
+  .qa-btn span.label { font-size: 11.5px; font-weight: 600; color: var(--text-dim); }
+
+  /* ---------- Stat row ---------- */
+  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat-tile { background: var(--surface); border-radius: 18px; padding: 14px 10px; text-align: center; box-shadow: var(--shadow-sm); }
+  .stat-num { display: block; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .stat-label { display: block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); margin-top: 3px; }
+  .stat-chip {
+    display: inline-block; margin-top: 6px; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  }
+  .stat-chip.good { background: var(--good-tint); color: var(--good); }
+  .stat-chip.warn { background: var(--warn-tint); color: var(--warn); }
+
+  /* ---------- Cards ---------- */
+  .card { background: var(--surface); border-radius: 20px; padding: 18px; box-shadow: var(--shadow-sm); }
+  .card + .card { margin-top: 12px; }
+
+  .plan-card { position: relative; overflow: hidden; }
+  .plan-eyebrow { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: var(--accent); }
+  .plan-card h2 { font-size: 21px; font-weight: 800; margin: 4px 0 2px; letter-spacing: -0.015em; }
+  .plan-meta { font-size: 13px; color: var(--text-dim); font-weight: 500; }
+  .plan-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 16px; }
+  .plan-chip { font-size: 12px; font-weight: 600; padding: 6px 11px; border-radius: 999px; background: var(--surface-2); color: var(--text-dim); }
+  .btn-primary {
+    width: 100%; border: none; border-radius: 14px; padding: 14px; font-size: 15.5px; font-weight: 700;
+    background: linear-gradient(180deg, var(--accent-2), var(--accent)); color: var(--accent-ink);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  .btn-primary svg.icon { width: 17px; height: 17px; }
+
+  /* ---------- Getting started checklist ---------- */
+  .checklist-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .checklist-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .checklist-row:first-child { padding-top: 0; }
+  .check-icon { width: 22px; height: 22px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .check-icon.done { background: var(--good); color: #fff; }
+  .check-icon.todo { border: 1.75px solid var(--border); color: transparent; }
+  .check-icon svg.icon { width: 13px; height: 13px; stroke-width: 2.5; }
+  .checklist-row span.title { font-size: 14.5px; font-weight: 600; flex: 1; }
+  .checklist-row.todo span.title { color: var(--text-dim); }
+  .checklist-row .chev { color: var(--text-faint); }
+  .checklist-row .chev svg.icon { width: 15px; height: 15px; }
+  .progress-track { height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; margin: 2px 0 16px; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent-2), var(--accent)); border-radius: 3px; }
+
+  /* ---------- Calendar strip ---------- */
+  .cal-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; }
+  .cal-day-label { font-size: 10px; font-weight: 700; color: var(--text-faint); margin-bottom: 8px; }
+  .cal-dot {
+    width: 34px; height: 34px; margin: 0 auto; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-dim);
+  }
+  .cal-dot.done { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--accent); }
+  .cal-dot.today { border: 1.75px solid var(--accent); color: var(--accent); }
+  .cal-col { display: flex; flex-direction: column; align-items: center; }
+
+  /* ---------- Recent activity ---------- */
+  .activity-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+  .activity-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .activity-row:first-child { padding-top: 0; }
+  .activity-icon {
+    width: 36px; height: 36px; border-radius: 11px; flex: none; display: flex; align-items: center; justify-content: center;
+    background: var(--surface-2); color: var(--accent);
+  }
+  .activity-icon svg.icon { width: 17px; height: 17px; }
+  .activity-body { flex: 1; min-width: 0; }
+  .activity-body .t { font-size: 14.5px; font-weight: 700; }
+  .activity-body .s { font-size: 12.5px; color: var(--text-dim); margin-top: 1px; }
+  .activity-pct { font-size: 13px; font-weight: 800; color: var(--good); font-variant-numeric: tabular-nums; }
+
+  /* ---------- Tab bar ---------- */
+  .tabbar {
+    position: absolute; left: 14px; right: 14px; bottom: 14px;
+    height: 82px;
+    background: color-mix(in srgb, var(--surface) 85%, transparent);
+    backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border-radius: 42px 42px 42px 42px;
+    border: 1px solid var(--border);
+    display: flex; align-items: flex-start; justify-content: space-around; padding-top: 12px;
+    box-shadow: var(--shadow-md);
+  }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-faint); }
+  .tab.active { color: var(--accent); }
+  .tab svg.icon { width: 23px; height: 23px; }
+  .tab span { font-size: 10px; font-weight: 700; }
+
+  /* ---------- Specimen / design notes panel ---------- */
+  .specimen { padding-top: 8px; }
+  .specimen h2 { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); margin: 0 0 14px; }
+  .specimen .blurb { font-size: 14px; line-height: 1.6; color: var(--text-dim); margin: 0 0 26px; max-width: 46ch; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 28px; }
+  .swatch { width: 84px; }
+  .swatch .chip { height: 52px; border-radius: 12px; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
+  .swatch .name { font-size: 11px; font-weight: 700; margin-top: 6px; color: var(--text); }
+  .swatch .hex { font-size: 10.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+  .type-scale { display: flex; flex-direction: column; gap: 14px; }
+  .type-row { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+  .type-row:last-child { border-bottom: none; }
+  .type-sample { flex: 1; color: var(--text); }
+  .type-meta { font-size: 11px; color: var(--text-faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ts-title { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; }
+  .ts-header { font-size: 17px; font-weight: 700; }
+  .ts-body { font-size: 15px; font-weight: 400; }
+  .ts-caption { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-faint); }
+  .footnote { font-size: 12px; color: var(--text-faint); line-height: 1.6; margin-top: 26px; max-width: 46ch; }
+</style>
+
+<div class="stage">
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar">
+          <span>9:41</span>
+          <span class="glyphs">
+            <svg class="icon" viewBox="0 0 20 12"><path d="M1 9.5V10.5M5 7V10.5M9 4V10.5M13 1.5V10.5"/></svg>
+            <svg class="icon" viewBox="0 0 20 14"><path d="M2 5.5C6 1.8 14 1.8 18 5.5M5 8.5C7.8 6 12.2 6 15 8.5M8.3 11.3C9.2 10.5 10.8 10.5 11.7 11.3"/></svg>
+            <svg class="icon" viewBox="0 0 25 12"><rect x="1" y="1.5" width="20" height="9" rx="2.5"/><path d="M23 4.5v3" stroke-linecap="round" fill="none"/><rect x="3" y="3.5" width="16" height="5" rx="1" fill="currentColor" stroke="none"/></svg>
+          </span>
+        </div>
+
+        <div class="content">
+          <div class="navhead">
+            <div>
+              <h1>Good morning,<br>Alex</h1>
+              <p class="date">Wednesday, August 5</p>
+            </div>
+            <button class="avatar-btn" aria-label="Profile">
+              <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4.5 5-6 8-6s6.5 1.5 8 6"/></svg>
+            </button>
+          </div>
+
+          <div class="quick-actions">
+            <button class="qa-btn">
+              <span class="qa-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg></span>
+              <span class="label">Start</span>
+            </button>
+            <button class="qa-btn">
+              <span class="qa-icon"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/></svg></span>
+              <span class="label">Template</span>
+            </button>
+            <button class="qa-btn">
+              <span class="qa-icon"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 12 15 9"/><path d="M12 6.5v1.2M12 16.3v1.2M6.5 12h1.2M16.3 12h1.2"/></svg></span>
+              <span class="label">Log Weight</span>
+            </button>
+            <button class="qa-btn">
+              <span class="qa-icon"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.8 2.2"/><path d="M9.8 3.5h4.4"/></svg></span>
+              <span class="label">Timer</span>
+            </button>
+          </div>
+
+          <div class="section-label">This Week</div>
+          <div class="stat-row">
+            <div class="stat-tile">
+              <span class="stat-num">1</span>
+              <span class="stat-label">Day Streak</span>
+              <span class="stat-chip good">New!</span>
+            </div>
+            <div class="stat-tile">
+              <span class="stat-num">1/3</span>
+              <span class="stat-label">Workouts</span>
+              <span class="stat-chip good">On track</span>
+            </div>
+            <div class="stat-tile">
+              <span class="stat-num">24.8</span>
+              <span class="stat-label">BMI</span>
+              <span class="stat-chip good">Healthy</span>
+            </div>
+          </div>
+
+          <div class="section-label">Today's Plan</div>
+          <div class="card plan-card">
+            <div class="plan-eyebrow">Full Body · 20 min</div>
+            <h2>Full Body Circuit</h2>
+            <div class="plan-meta">6 exercises · beginner-scaled</div>
+            <div class="plan-chips">
+              <span class="plan-chip">Push-Up</span>
+              <span class="plan-chip">Squat</span>
+              <span class="plan-chip">Plank</span>
+              <span class="plan-chip">Glute Bridge</span>
+              <span class="plan-chip">Jumping Jacks</span>
+              <span class="plan-chip">+1 more</span>
+            </div>
+            <button class="btn-primary">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg>
+              Start Workout
+            </button>
+          </div>
+
+          <div class="section-label">Getting Started</div>
+          <div class="card">
+            <div class="progress-track"><div class="progress-fill" style="width:50%"></div></div>
+            <div class="checklist-row">
+              <span class="check-icon done"><svg class="icon" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>
+              <span class="title">Build your profile</span>
+              <span class="chev"><svg class="icon" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+            </div>
+            <div class="checklist-row">
+              <span class="check-icon done"><svg class="icon" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>
+              <span class="title">Log your first workout</span>
+              <span class="chev"><svg class="icon" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+            </div>
+            <div class="checklist-row todo">
+              <span class="check-icon todo"></span>
+              <span class="title">Save a workout template</span>
+              <span class="chev"><svg class="icon" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+            </div>
+            <div class="checklist-row todo">
+              <span class="check-icon todo"></span>
+              <span class="title">Add a progress photo</span>
+              <span class="chev"><svg class="icon" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+            </div>
+          </div>
+
+          <div class="section-label">This Week's Calendar</div>
+          <div class="card">
+            <div class="cal-strip">
+              <div class="cal-col"><span class="cal-day-label">S</span><span class="cal-dot">2</span></div>
+              <div class="cal-col"><span class="cal-day-label">M</span><span class="cal-dot">3</span></div>
+              <div class="cal-col"><span class="cal-day-label">T</span><span class="cal-dot">4</span></div>
+              <div class="cal-col"><span class="cal-day-label">W</span><span class="cal-dot today">5</span></div>
+              <div class="cal-col"><span class="cal-day-label">T</span><span class="cal-dot">6</span></div>
+              <div class="cal-col"><span class="cal-day-label">F</span><span class="cal-dot">7</span></div>
+              <div class="cal-col"><span class="cal-day-label">S</span><span class="cal-dot">8</span></div>
+            </div>
+          </div>
+
+          <div class="section-label">Recent Activity</div>
+          <div class="card">
+            <div class="activity-row">
+              <span class="activity-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M6.5 7h11M6.5 12h11M6.5 17h7"/></svg></span>
+              <span class="activity-body">
+                <div class="t">Full Body Circuit</div>
+                <div class="s">Today · 22 min</div>
+              </span>
+              <span class="activity-pct">100%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tab active">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10.5V20h12v-9.5"/></svg>
+            <span>Home</span>
+          </div>
+          <div class="tab">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M3 12h2M19 12h2M6 8v8M18 8v8M6 12h12"/></svg>
+            <span>Exercises</span>
+          </div>
+          <div class="tab">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 20V10M11 20V4M18 20v-7"/></svg>
+            <span>Progress</span>
+          </div>
+          <div class="tab">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4.5 5-6 8-6s6.5 1.5 8 6"/></svg>
+            <span>Profile</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="specimen">
+    <h2>Design Notes</h2>
+    <p class="blurb">A dashboard for someone on day one — the primary card is today's single workout, not a wall of stats, and a "Getting Started" widget carries new-user onboarding without a separate tour.</p>
+
+    <h2>Palette</h2>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#eef0f8;"></div><div class="name">Ground</div><div class="hex">#EEF0F8</div></div>
+      <div class="swatch"><div class="chip" style="background:#ffffff;"></div><div class="name">Surface</div><div class="hex">#FFFFFF</div></div>
+      <div class="swatch"><div class="chip" style="background:#1e2333;"></div><div class="name">Ink</div><div class="hex">#1E2333</div></div>
+      <div class="swatch"><div class="chip" style="background:#6366f1;"></div><div class="name">Accent</div><div class="hex">#6366F1</div></div>
+      <div class="swatch"><div class="chip" style="background:#059669;"></div><div class="name">Good (state)</div><div class="hex">#059669</div></div>
+      <div class="swatch"><div class="chip" style="background:#d97706;"></div><div class="name">Warn (state)</div><div class="hex">#D97706</div></div>
+    </div>
+
+    <h2>Type Scale</h2>
+    <div class="type-scale">
+      <div class="type-row"><span class="type-sample ts-title">Good morning</span><span class="type-meta">30 / 800</span></div>
+      <div class="type-row"><span class="type-sample ts-header">Full Body Circuit</span><span class="type-meta">17 / 700</span></div>
+      <div class="type-row"><span class="type-sample ts-body">6 exercises · 20 min</span><span class="type-meta">15 / 400</span></div>
+      <div class="type-row"><span class="type-sample ts-caption">This Week</span><span class="type-meta">11 / 700</span></div>
+    </div>
+    <p class="footnote">Text renders in San Francisco on Apple devices via <code>-apple-system</code>, falling back to the platform's own system-ui elsewhere — the HIG convention is the system font itself, not a bundled substitute. Ground is a cool-tinted off-white rather than pure grey, echoing the indigo accent; ink is a deep indigo-slate for the same reason. Good/Warn are state colors, kept out of the 3-color brand count.</p>
+  </div>
+</div>

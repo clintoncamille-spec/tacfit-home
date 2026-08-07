@@ -43,4 +43,7 @@ const POSES = {
   gluteBridge: `<svg viewBox="0 0 100 100"><circle cx="14" cy="66" r="8"/><line x1="20" y1="64" x2="55" y2="50"/><line x1="55" y1="50" x2="85" y2="66"/><line x1="55" y1="50" x2="55" y2="86"/><line x1="20" y1="64" x2="12" y2="86"/></svg>`,
 
   wallSit: `<svg viewBox="0 0 100 100"><line x1="18" y1="10" x2="18" y2="90"/><circle cx="34" cy="26" r="8"/><line x1="30" y1="34" x2="30" y2="60"/><line x1="30" y1="60" x2="55" y2="60"/><line x1="55" y1="60" x2="55" y2="88"/></svg>`,
+
+  // Generic fallback for user-added custom exercises (no hand-drawn pose available).
+  custom: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="34"/><line x1="50" y1="34" x2="50" y2="66"/><line x1="34" y1="50" x2="66" y2="50"/></svg>`,
 };

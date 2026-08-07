@@ -22,6 +22,7 @@ function defaultDB() {
     activeSession: null,    // in-progress workout session state, so a refresh doesn't lose progress
     workoutTemplates: [],   // [{id, name, exercises:[{exerciseId,sets,reps}], createdAt, updatedAt}]
     progressPhotos: [],     // [{id, date, storagePath, createdAt}] — metadata only, image bytes live in Supabase Storage
+    customExercises: [],    // [{id, name, category, pose, targets, avoidInjuries, isHold, scale, steps}] — user-added, local-only
   };
 }
 
@@ -121,6 +122,16 @@ const Store = {
     db.progressPhotos = db.progressPhotos.filter((p) => p.id !== id);
     saveDB(db);
     if (typeof Sync !== "undefined") Sync.schedulePush();
+  },
+
+  // Local-only, same tier as workoutTemplates — not fed into the automatic plan generator,
+  // only available for manual browsing (Library) and template-building.
+  getCustomExercises() { return loadDB().customExercises; },
+
+  addCustomExercise(exercise) {
+    const db = loadDB();
+    db.customExercises.push(exercise);
+    saveDB(db);
   },
 };
 

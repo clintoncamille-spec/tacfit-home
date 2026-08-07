@@ -7,6 +7,8 @@ const App = {
   historyExerciseId: null,
   calendarMonthOffset: 0,
   photoLightboxId: null, photoLightboxUrl: null,
+  logWeightModalOpen: false,
+  customExModalOpen: false, customExerciseDraft: null,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -65,20 +67,67 @@ function render() {
 
 function navBarHTML(active) {
   const items = [
-    { id: "dashboard", label: "Home", icon: iconHome },
-    { id: "library", label: "Exercises", icon: iconDumbbell },
-    { id: "analytics", label: "Progress", icon: iconChart },
-    { id: "settings", label: "Profile", icon: iconPerson },
+    { id: "dashboard", label: "Home", icon: "home" },
+    { id: "library", label: "Exercises", icon: "dumbbell" },
+    { id: "analytics", label: "Progress", icon: "bar-chart" },
+    { id: "settings", label: "Profile", icon: "user-circle" },
   ];
   return `<nav class="tabbar">${items
-    .map((it) => `<button class="tab ${active === it.id ? "active" : ""}" onclick="go('${it.id}')">${it.icon}<span>${it.label}</span></button>`)
+    .map((it) => `<button class="tab ${active === it.id ? "active" : ""}" onclick="go('${it.id}')">${iconHTML(it.icon)}<span>${it.label}</span></button>`)
     .join("")}</nav>`;
 }
 
-const iconHome = `<svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5" /><path d="M6 10.5V20h12v-9.5" /></svg>`;
-const iconDumbbell = `<svg viewBox="0 0 24 24"><path d="M3 12h2M19 12h2M6 8v8M18 8v8M6 12h12" /></svg>`;
-const iconChart = `<svg viewBox="0 0 24 24"><path d="M4 20V10M11 20V4M18 20v-7" /></svg>`;
-const iconPerson = `<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4.5 5-6 8-6s6.5 1.5 8 6"/></svg>`;
+// ---------- Icon system ----------
+// One shared set of SF Symbols-influenced outline glyphs (24x24 grid, rendered at 20px/2px
+// stroke via the .icon CSS class — see styles.css). Every icon in the app goes through
+// iconHTML() so sizing/stroke stays uniform; nothing hand-rolls its own <svg> anymore.
+const ICONS = {
+  home: `<path d="M4 11.5 12 4l8 7.5"/><path d="M6 10.5V20h12v-9.5"/>`,
+  dumbbell: `<path d="M4 12h2M18 12h2M7 8v8M17 8v8M7 12h10"/>`,
+  "bar-chart": `<path d="M5 20V11M12 20V4M19 20v-7"/>`,
+  "user-circle": `<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="10" r="2.7"/><path d="M6.5 18c1.3-3 3.4-4 5.5-4s4.2 1 5.5 4"/>`,
+  scale: `<circle cx="12" cy="12" r="8.5"/><path d="M12 12 15 9"/><path d="M12 6.5v1.3M12 16.2v1.3M6.5 12h1.3M16.2 12h1.3"/>`,
+  timer: `<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.6 2"/><path d="M9.5 3.5h5"/>`,
+  plus: `<path d="M12 5v14M5 12h14"/>`,
+  "plus-circle": `<circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/>`,
+  minus: `<path d="M5 12h14"/>`,
+  x: `<path d="M6 6l12 12M18 6 6 18"/>`,
+  check: `<path d="M5 13l4.5 4.5L19 7"/>`,
+  "chevron-left": `<path d="M14.5 6 8.5 12l6 6"/>`,
+  "chevron-right": `<path d="M9.5 6l6 6-6 6"/>`,
+  "chevron-up": `<path d="M6 14.5 12 8.5l6 6"/>`,
+  "chevron-down": `<path d="M6 9.5l6 6 6-6"/>`,
+  calendar: `<rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 10h16"/><path d="M8 3.5v4M16 3.5v4"/>`,
+  "calendar-days": `<rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 10h16"/><path d="M8 3.5v4M16 3.5v4"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01"/>`,
+  activity: `<path d="M3 12h4l2-7 4 14 2-7h6"/>`,
+  "trending-up": `<path d="M4 17l6-6 4 4 6-8"/><path d="M14 6h6v6"/>`,
+  "trending-down": `<path d="M4 7l6 6 4-4 6 8"/><path d="M20 11v6h-6"/>`,
+  zap: `<path d="M13 3 6 14h5l-1 7 8-11h-5l1-7Z"/>`,
+  "scale-balance": `<path d="M12 4v16M7 8h10"/><path d="M7 8 4 14a3 3 0 0 0 6 0Z"/><path d="M17 8l-3 6a3 3 0 0 0 6 0Z"/>`,
+  "bar-chart-3": `<path d="M4 6h11M4 12h16M4 18h8"/>`,
+  camera: `<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8 7l1.5-2.5h5L16 7"/><circle cx="12" cy="13.5" r="3.5"/>`,
+  list: `<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>`,
+  "alert-triangle": `<path d="M12 4.5 21 19.5H3Z"/><path d="M12 10v4.5M12 17h.01"/>`,
+  history: `<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l3 2"/><path d="M4.5 8.5A8 8 0 0 1 8 5"/><path d="M3 4v4h4"/>`,
+  "play-circle": `<circle cx="12" cy="12" r="8.5"/><path d="M10 8.5v7l6-3.5Z"/>`,
+};
+
+function iconHTML(name) {
+  return `<svg class="icon" viewBox="0 0 24 24">${ICONS[name] || ""}</svg>`;
+}
+
+// Real brand marks for the two OAuth buttons — deliberately not run through the outline-only
+// .icon system, since generic monochrome icons would misrepresent these third-party sign-in
+// buttons (standard practice everywhere "Continue with X" appears).
+const ICON_GOOGLE = `<svg class="icon-brand" viewBox="0 0 24 24">
+  <path fill="#4285F4" d="M22.5 12.2c0-.8-.1-1.5-.2-2.2H12v4.3h5.9c-.3 1.4-1 2.5-2.2 3.3v2.7h3.6c2.1-1.9 3.2-4.8 3.2-8.1Z"/>
+  <path fill="#34A853" d="M12 23c2.9 0 5.4-1 7.2-2.6l-3.6-2.7c-1 .7-2.2 1.1-3.6 1.1-2.8 0-5.1-1.9-6-4.4H2.3v2.8C4.1 20.6 7.8 23 12 23Z"/>
+  <path fill="#FBBC05" d="M6 14.4c-.2-.7-.3-1.4-.3-2.1s.1-1.4.3-2.1V7.4H2.3A11 11 0 0 0 1 12.3c0 1.8.4 3.5 1.3 5l3.7-2.9Z"/>
+  <path fill="#EA4335" d="M12 5.4c1.6 0 3 .5 4.1 1.6l3.1-3.1C17.4 2.2 14.9 1 12 1 7.8 1 4.1 3.4 2.3 7.4l3.7 2.9c.9-2.5 3.2-4.9 6-4.9Z"/>
+</svg>`;
+const ICON_GITHUB = `<svg class="icon-brand" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M12 .5C5.7.5.8 5.4.8 11.8c0 5.1 3.3 9.4 7.9 11 .6.1.8-.3.8-.6v-2.2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.5-.3-5.2-1.3-5.2-5.6 0-1.2.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.1 0 4.3-2.7 5.3-5.2 5.6.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.6 7.9-5.9 7.9-11C23.2 5.4 18.3.5 12 .5Z"/>
+</svg>`;
 
 // ---------- Onboarding ----------
 
@@ -414,9 +463,9 @@ function calendarHTML(workoutHistory) {
   return `
     <div class="card">
       <div class="cal-head">
-        <button class="btn-icon" onclick="shiftCalendarMonth(-1)">&larr;</button>
-        <div class="eyebrow">${monthLabel}</div>
-        <button class="btn-icon" onclick="shiftCalendarMonth(1)">&rarr;</button>
+        <button class="btn-icon" onclick="shiftCalendarMonth(-1)">${iconHTML("chevron-left")}</button>
+        <div class="eyebrow">${iconHTML("calendar")}<span>${monthLabel}</span></div>
+        <button class="btn-icon" onclick="shiftCalendarMonth(1)">${iconHTML("chevron-right")}</button>
       </div>
       <div class="cal-weekdays">${["S", "M", "T", "W", "T", "F", "S"].map((d) => `<span>${d}</span>`).join("")}</div>
       <div class="cal-grid">${cells.join("")}</div>
@@ -438,7 +487,9 @@ function renderDashboard(screen) {
   const cat = bmiCategory(bmi);
   const streak = computeStreak(db.workoutHistory);
   const thisWeekCount = countThisWeek(db.workoutHistory);
-  const resumable = !!db.activeSession;
+  // Only treat an in-progress session as "resuming this card" if it's actually for today's
+  // plan day — a template-started session (dayIndex: null) shouldn't be conflated with it.
+  const activeSessionForToday = day && db.activeSession && db.activeSession.dayIndex === day.dayIndex ? db.activeSession : null;
 
   screen.innerHTML = `
     <div class="header">
@@ -448,32 +499,264 @@ function renderDashboard(screen) {
 
     ${accountBannerHTML()}
 
+    ${quickActionToolbarHTML()}
+
     <div class="stat-row">
       <div class="stat-tile"><span class="stat-num">${streak}</span><span class="stat-label">Day Streak</span></div>
       <div class="stat-tile"><span class="stat-num">${thisWeekCount}/${profile.prescribedFrequency}</span><span class="stat-label">This Week</span></div>
       <div class="stat-tile"><span class="stat-num">${bmi ? bmi.toFixed(1) : "—"}</span><span class="stat-label">${cat.label}</span></div>
     </div>
 
+    ${todaysActivityHTML(db)}
+
     ${calendarHTML(db.workoutHistory)}
 
     <div class="card plan-card">
       <div class="plan-card-head">
         <div>
-          <div class="eyebrow">${resumable ? "Resume Workout" : "Today's Plan"}</div>
+          <div class="eyebrow">${iconHTML("play-circle")}<span>${activeSessionForToday ? "Resume Workout" : "Today's Plan"}</span></div>
           <h2>${day ? day.label : "Rest Day"}</h2>
         </div>
         <div class="plan-meta">${day ? day.exercises.length + " exercises · ~" + profile.duration + " min" : ""}</div>
       </div>
-      ${day ? `<div class="chip-row">${day.exercises.slice(0, 6).map((ex) => `<span class="chip">${exerciseById(ex.exerciseId).name}</span>`).join("")}</div>` : `<p class="muted">No plan yet — check your Profile to set a frequency.</p>`}
-      ${day ? `<button class="btn btn-primary btn-block" onclick="startWorkout(${day.dayIndex})">${resumable ? "Resume Workout" : "Start Workout"}</button>` : ""}
+      ${day ? planChecklistHTML(day, activeSessionForToday) : `<p class="muted">No plan yet — check your Profile to set a frequency.</p>`}
+      ${day ? `<button class="btn btn-primary btn-block" onclick="startWorkout(${day.dayIndex})">${activeSessionForToday ? "Resume Workout" : "Start Workout"}</button>` : ""}
       <button class="btn btn-secondary btn-block" onclick="go('templates')">Start From Template</button>
     </div>
 
     <div class="card">
-      <div class="eyebrow">Fitness vs BMI</div>
+      <div class="eyebrow">${iconHTML("scale-balance")}<span>Fitness vs BMI</span></div>
       <p>${fitnessVsBmiInsight(bmi, fitnessScore(latestTest(db).pushups, latestTest(db).pullups))}</p>
     </div>
+    ${App.restActive ? restModalHTML() : ""}
+    ${App.logWeightModalOpen ? logWeightModalHTML() : ""}
+    ${App.customExModalOpen ? customExerciseModalHTML() : ""}
   `;
+  bindDashboardModalEvents();
+}
+
+// ---------- Quick Actions (dashboard) ----------
+
+function quickActionToolbarHTML() {
+  return `
+    <div class="quick-actions">
+      <button class="qa-btn" onclick="openLogWeightModal()">
+        <span class="qa-icon">${iconHTML("scale")}</span>
+        <span class="qa-label">Log Weight</span>
+      </button>
+      <button class="qa-btn" onclick="startRestTimer(App.restDuration)">
+        <span class="qa-icon">${iconHTML("timer")}</span>
+        <span class="qa-label">Start Timer</span>
+      </button>
+      <button class="qa-btn" onclick="openCustomExerciseModal()">
+        <span class="qa-icon">${iconHTML("plus")}</span>
+        <span class="qa-label">Add Exercise</span>
+      </button>
+    </div>`;
+}
+
+// ---------- Today's Activity (7-day volume trend) ----------
+
+function workoutVolume(w) {
+  return (w.exerciseResults || []).reduce((sum, r) => {
+    const workingSets = Math.max(0, r.setsDone - (r.warmupSetsDone || 0));
+    return sum + workingSets * (r.reps || 0);
+  }, 0);
+}
+
+function todaysActivityHTML(db) {
+  const today = todayISO();
+  const todaysWorkouts = db.workoutHistory.filter((w) => w.date === today);
+  const activeMinutes = todaysWorkouts.reduce((s, w) => s + w.durationMin, 0);
+  const todaysVolume = todaysWorkouts.reduce((s, w) => s + workoutVolume(w), 0);
+
+  const trend = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const dayVolume = db.workoutHistory.filter((w) => w.date === iso).reduce((s, w) => s + workoutVolume(w), 0);
+    trend.push(dayVolume);
+  }
+
+  return `
+    <div class="card">
+      <div class="eyebrow">${iconHTML("activity")}<span>Today's Activity</span></div>
+      <div class="activity-metrics">
+        <div class="activity-metric"><span class="stat-num">${activeMinutes}</span><span class="stat-label">Active Min</span></div>
+        <div class="activity-metric"><span class="stat-num">${todaysVolume}</span><span class="stat-label">Volume</span></div>
+      </div>
+      <div class="trend-wrap">
+        ${sparklineSVG(trend)}
+        <span class="trend-label">7-Day Volume Trend</span>
+      </div>
+    </div>`;
+}
+
+function sparklineSVG(values) {
+  const width = 280, height = 46;
+  const max = Math.max(1, ...values);
+  const n = values.length;
+  const stepX = width / Math.max(1, n - 1);
+  const points = values.map((v, i) => [
+    Number((i * stepX).toFixed(1)),
+    Number((height - (v / max) * (height - 6) - 3).toFixed(1)),
+  ]);
+  const linePath = points.map((p, i) => (i === 0 ? "M" : "L") + p[0] + "," + p[1]).join(" ");
+  const areaPath = `${linePath} L${width},${height} L0,${height} Z`;
+  const last = points[points.length - 1];
+  return `
+    <svg viewBox="0 0 ${width} ${height}" class="trend-svg" preserveAspectRatio="none">
+      <path d="${areaPath}" fill="var(--accent)" fill-opacity="0.16" stroke="none"></path>
+      <path d="${linePath}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+      <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="var(--accent)"></circle>
+    </svg>`;
+}
+
+// ---------- Today's Plan checklist ----------
+
+function planChecklistHTML(day, activeSessionForToday) {
+  return `
+    <div class="session-list">
+      ${day.exercises.map((ex, i) => {
+        const meta = exerciseById(ex.exerciseId);
+        const se = activeSessionForToday ? activeSessionForToday.exercises[i] : null;
+        const doneCount = se ? se.done.filter(Boolean).length : 0;
+        const state = !se || doneCount === 0 ? "pending" : doneCount >= ex.sets ? "done" : "partial";
+        const icon = state === "done" ? iconHTML("check") : state === "partial" ? iconHTML("minus") : "";
+        return `
+          <div class="session-row">
+            <span class="session-check ${state}">${icon}</span>
+            <span class="session-name">${meta.name}</span>
+            <span class="session-target">${ex.sets} × ${ex.reps}${meta.isHold ? "s" : ""}</span>
+          </div>`;
+      }).join("")}
+    </div>`;
+}
+
+// ---------- Log Weight (quick action) ----------
+
+function logWeightModalHTML() {
+  const profile = Store.getProfile();
+  return `
+    <div class="rest-modal-backdrop">
+      <div class="card rest-modal">
+        <div class="eyebrow">${iconHTML("scale")}<span>Log Weight</span></div>
+        <label class="field-label">Weight (${profile.units === "metric" ? "kg" : "lb"})</label>
+        <input class="input" id="quick-weight-input" type="number">
+        <div class="auth-error" id="quick-weight-error"></div>
+        <div class="row2">
+          <button class="btn btn-secondary" onclick="closeLogWeightModal()">Cancel</button>
+          <button class="btn btn-primary" id="quick-weight-save-btn">Save</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function openLogWeightModal() {
+  App.logWeightModalOpen = true;
+  render();
+}
+
+function closeLogWeightModal() {
+  App.logWeightModalOpen = false;
+  render();
+}
+
+function saveQuickWeight() {
+  const profile = Store.getProfile();
+  const raw = Number(document.getElementById("quick-weight-input").value);
+  const errBox = document.getElementById("quick-weight-error");
+  if (!raw || raw <= 0) { errBox.textContent = "Enter a valid weight."; return; }
+  const kg = profile.units === "metric" ? raw : lbToKg(raw);
+  Store.logWeight(kg);
+  profile.weightKg = kg;
+  profile.updatedAt = todayISO();
+  Store.saveProfile(profile);
+  closeLogWeightModal();
+}
+
+// ---------- Add Custom Exercise (quick action) ----------
+
+function customExerciseModalHTML() {
+  const d = App.customExerciseDraft;
+  return `
+    <div class="rest-modal-backdrop">
+      <div class="card rest-modal custom-ex-modal">
+        <div class="eyebrow">${iconHTML("plus-circle")}<span>Add Custom Exercise</span></div>
+        <label class="field-label">Name</label>
+        <input class="input" id="custom-ex-name" type="text" placeholder="e.g. Kettlebell Swing" value="${escapeHtml(d.name)}">
+        <label class="field-label">Category</label>
+        <div class="chip-filter">
+          ${["upper", "lower", "core", "cardio"].map((c) => `<button class="chip-toggle ${d.category === c ? "on" : ""}" onclick="setCustomExField('category','${c}')">${CATEGORY_LABELS[c]}</button>`).join("")}
+        </div>
+        <label class="field-label">Type</label>
+        <div class="segmented">
+          <button class="seg ${!d.isHold ? "on" : ""}" onclick="setCustomExField('isHold', false)">Reps</button>
+          <button class="seg ${d.isHold ? "on" : ""}" onclick="setCustomExField('isHold', true)">Timed Hold</button>
+        </div>
+        <div class="row2">
+          <div><label class="field-label">Sets</label><input class="input" id="custom-ex-sets" type="number" min="1" value="${d.sets}"></div>
+          <div><label class="field-label">${d.isHold ? "Seconds" : "Reps"}</label><input class="input" id="custom-ex-reps" type="number" min="1" value="${d.reps}"></div>
+        </div>
+        <div class="auth-error" id="custom-ex-error"></div>
+        <div class="row2">
+          <button class="btn btn-secondary" onclick="closeCustomExerciseModal()">Cancel</button>
+          <button class="btn btn-primary" id="custom-ex-save-btn">Save</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function openCustomExerciseModal() {
+  App.customExerciseDraft = { name: "", category: "upper", isHold: false, sets: 3, reps: 10 };
+  App.customExModalOpen = true;
+  render();
+}
+
+function closeCustomExerciseModal() {
+  App.customExModalOpen = false;
+  App.customExerciseDraft = null;
+  render();
+}
+
+function syncCustomExDraftFromInputs() {
+  const nameEl = document.getElementById("custom-ex-name");
+  const setsEl = document.getElementById("custom-ex-sets");
+  const repsEl = document.getElementById("custom-ex-reps");
+  if (nameEl) App.customExerciseDraft.name = nameEl.value;
+  if (setsEl) App.customExerciseDraft.sets = Number(setsEl.value) || App.customExerciseDraft.sets;
+  if (repsEl) App.customExerciseDraft.reps = Number(repsEl.value) || App.customExerciseDraft.reps;
+}
+
+function setCustomExField(field, value) {
+  syncCustomExDraftFromInputs();
+  App.customExerciseDraft[field] = value;
+  render();
+}
+
+function saveCustomExercise() {
+  syncCustomExDraftFromInputs();
+  const d = App.customExerciseDraft;
+  const errBox = document.getElementById("custom-ex-error");
+  if (!d.name.trim()) { errBox.textContent = "Give it a name."; return; }
+  const sets = Math.max(1, Number(d.sets) || 1);
+  const reps = Math.max(1, Number(d.reps) || 1);
+  Store.addCustomExercise({
+    id: "custom_" + crypto.randomUUID(),
+    name: d.name.trim(), category: d.category, pose: "custom",
+    targets: [], avoidInjuries: [], isHold: d.isHold,
+    scale: { beginner: [sets, reps], intermediate: [sets, reps], advanced: [sets, reps] },
+    steps: [],
+  });
+  closeCustomExerciseModal();
+}
+
+function bindDashboardModalEvents() {
+  const saveWeightBtn = document.getElementById("quick-weight-save-btn");
+  if (saveWeightBtn) saveWeightBtn.addEventListener("click", saveQuickWeight);
+  const saveExBtn = document.getElementById("custom-ex-save-btn");
+  if (saveExBtn) saveExBtn.addEventListener("click", saveCustomExercise);
 }
 
 function latestTest(db) {
@@ -549,7 +832,7 @@ function renderSession() {
   App.root.innerHTML = `
     <div class="screen session-screen">
       <div class="session-head">
-        <button class="btn-icon" onclick="exitSession()">&larr;</button>
+        <button class="btn-icon" onclick="exitSession()">${iconHTML("chevron-left")}</button>
         <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
         <span class="muted">${pct}%</span>
       </div>
@@ -572,7 +855,7 @@ function sessionExerciseCard(se, i) {
   return `
     <div class="card ex-card ${allDone ? "complete" : ""}" style="animation-delay:${Math.min(i * 0.05, 0.3)}s">
       <div class="ex-card-head">
-        <div class="ex-pose">${POSES[ex.pose]}${allDone ? `<span class="complete-badge">✓</span>` : ""}</div>
+        <div class="ex-pose">${POSES[ex.pose]}${allDone ? `<span class="complete-badge">${iconHTML("check")}</span>` : ""}</div>
         <div>
           <h3>${ex.name}</h3>
           <p class="muted">${se.sets} sets × ${se.reps}${ex.isHold ? " sec" : " reps"}</p>
@@ -638,7 +921,7 @@ function restModalHTML() {
     return `
       <div class="rest-modal-backdrop">
         <div class="card rest-modal rest-modal-done">
-          <div class="rest-modal-icon">&check;</div>
+          <div class="rest-modal-icon">${iconHTML("check")}</div>
           <div class="rest-modal-headline">Rest Over!</div>
           <button class="btn btn-primary btn-block" onclick="closeRestModal()">Continue</button>
         </div>
@@ -647,20 +930,23 @@ function restModalHTML() {
   return `
     <div class="rest-modal-backdrop">
       <div class="card rest-modal">
-        <div class="eyebrow">Rest</div>
+        <div class="eyebrow">${iconHTML("timer")}<span>Rest</span></div>
         <div class="rest-modal-time" id="rest-modal-time">${formatBigTime(App.restRemaining)}</div>
         <div class="rest-modal-presets">
           ${REST_PRESETS.map((s) => `<button class="chip-toggle ${s === App.restDuration ? "on" : ""}" onclick="setRestDuration(${s})">${formatRestLabel(s)}</button>`).join("")}
         </div>
         <div class="rest-modal-adjust">
-          <button class="btn btn-secondary" onclick="adjustRest(-15)">&minus;15s</button>
-          <button class="btn btn-secondary" onclick="adjustRest(15)">+15s</button>
+          <button class="btn btn-secondary" onclick="adjustRest(-15)">${iconHTML("minus")}<span>15s</span></button>
+          <button class="btn btn-secondary" onclick="adjustRest(15)">${iconHTML("plus")}<span>15s</span></button>
         </div>
         <button class="btn btn-secondary btn-block" onclick="skipRest()">Skip Rest</button>
       </div>
     </div>`;
 }
 
+// Rest can now be started from the Session screen (after a set) or directly from the
+// Dashboard's quick-action toolbar, so every re-render here goes through the generic render()
+// dispatcher rather than assuming the session route — it redraws whichever route is current.
 function startRestTimer(seconds) {
   clearInterval(App.restTimer);
   clearTimeout(App.restAutoCloseTimer);
@@ -669,7 +955,7 @@ function startRestTimer(seconds) {
   App.restActive = true;
   App.restDone = false;
   ensureAudioUnlocked();
-  renderSession();
+  render();
   App.restTimer = setInterval(restTick, 1000);
 }
 
@@ -681,7 +967,7 @@ function restTick() {
     clearInterval(App.restTimer);
     App.restDone = true;
     playRestAlert();
-    renderSession();
+    render();
     App.restAutoCloseTimer = setTimeout(closeRestModal, 3000);
     return;
   }
@@ -703,14 +989,14 @@ function skipRest() {
   clearTimeout(App.restAutoCloseTimer);
   App.restActive = false;
   App.restDone = false;
-  renderSession();
+  render();
 }
 
 function closeRestModal() {
   clearTimeout(App.restAutoCloseTimer);
   App.restActive = false;
   App.restDone = false;
-  renderSession();
+  render();
 }
 
 function formatBigTime(totalSeconds) {
@@ -807,9 +1093,9 @@ function renderTemplateList(screen) {
   const templates = Store.getTemplates();
   screen.innerHTML = `
     <div class="tmpl-head">
-      <button class="btn-icon" onclick="go('dashboard')">&larr;</button>
+      <button class="btn-icon" onclick="go('dashboard')">${iconHTML("chevron-left")}</button>
       <h1>Templates</h1>
-      <button class="btn-icon" onclick="newTemplateDraft()">+</button>
+      <button class="btn-icon" onclick="newTemplateDraft()">${iconHTML("plus")}</button>
     </div>
     ${templates.length ? templates.map(templateCardHTML).join("") : `
       <div class="card"><p class="muted">No templates yet — create one to quick-load your favorite combos.</p></div>
@@ -863,7 +1149,7 @@ function renderTemplateEditor(screen) {
   const draft = App.templateEditing;
   screen.innerHTML = `
     <div class="tmpl-head">
-      <button class="btn-icon" onclick="cancelTemplateEdit()">&larr;</button>
+      <button class="btn-icon" onclick="cancelTemplateEdit()">${iconHTML("chevron-left")}</button>
       <h1>${draft.isNew ? "New Template" : "Edit Template"}</h1>
       <span></span>
     </div>
@@ -875,7 +1161,7 @@ function renderTemplateEditor(screen) {
       ${draft.exercises.length ? draft.exercises.map((ex, i) => tmplExerciseRowHTML(ex, i, draft.exercises.length)).join("") : `<p class="muted">No exercises added yet.</p>`}
     </div>
 
-    <button class="btn btn-secondary btn-block" id="tmpl-add-btn">${App.templatePickerOpen ? "Close Picker" : "+ Add Exercise"}</button>
+    <button class="btn btn-secondary btn-block" id="tmpl-add-btn">${App.templatePickerOpen ? `${iconHTML("chevron-up")}<span>Close Picker</span>` : `${iconHTML("plus")}<span>Add Exercise</span>`}</button>
     ${App.templatePickerOpen ? templatePickerHTML(draft) : ""}
 
     <div class="auth-error" id="tmpl-error"></div>
@@ -889,8 +1175,8 @@ function tmplExerciseRowHTML(ex, i, total) {
   return `
     <div class="card tmpl-ex-row">
       <div class="tmpl-ex-row-move">
-        <button class="btn-icon tmpl-move-btn" ${i === 0 ? "disabled" : ""} onclick="moveDraftExercise(${i}, -1)">&#9650;</button>
-        <button class="btn-icon tmpl-move-btn" ${i === total - 1 ? "disabled" : ""} onclick="moveDraftExercise(${i}, 1)">&#9660;</button>
+        <button class="btn-icon tmpl-move-btn" ${i === 0 ? "disabled" : ""} onclick="moveDraftExercise(${i}, -1)">${iconHTML("chevron-up")}</button>
+        <button class="btn-icon tmpl-move-btn" ${i === total - 1 ? "disabled" : ""} onclick="moveDraftExercise(${i}, 1)">${iconHTML("chevron-down")}</button>
       </div>
       <div class="tmpl-ex-row-name">${meta.name}</div>
       <div class="tmpl-ex-row-fields">
@@ -899,7 +1185,7 @@ function tmplExerciseRowHTML(ex, i, total) {
         <input class="input" type="number" min="1" value="${ex.reps}" onchange="updateDraftExerciseField(${i}, 'reps', this.value)">
         <span class="muted">${meta.isHold ? "sec" : "reps"}</span>
       </div>
-      <button class="btn-icon" onclick="removeExerciseFromDraft(${i})">&times;</button>
+      <button class="btn-icon" onclick="removeExerciseFromDraft(${i})">${iconHTML("x")}</button>
     </div>`;
 }
 
@@ -914,7 +1200,8 @@ function moveDraftExercise(i, direction) {
 function templatePickerHTML(draft) {
   const cat = App.templatePickerCat || "all";
   const usedIds = new Set(draft.exercises.map((e) => e.exerciseId));
-  const items = cat === "all" ? EXERCISES : EXERCISES.filter((e) => e.category === cat);
+  const allExercises = allExercisesIncludingCustom();
+  const items = cat === "all" ? allExercises : allExercises.filter((e) => e.category === cat);
   return `
     <div class="chip-filter" id="tmpl-picker-filter">
       ${["all", "upper", "lower", "core", "cardio"].map((c) => `<button class="chip-toggle ${c === cat ? "on" : ""}" data-cat="${c}">${c === "all" ? "All" : CATEGORY_LABELS[c]}</button>`).join("")}
@@ -1022,7 +1309,7 @@ function renderLibrary(screen) {
   const list = document.getElementById("lib-list");
   const filterBar = document.getElementById("lib-filter");
   function draw(cat) {
-    let items = EXERCISES;
+    let items = allExercisesIncludingCustom();
     if (cat === "safe") items = items.filter((e) => safeForProfile(e, profile));
     else if (cat !== "all") items = items.filter((e) => e.category === cat);
     list.innerHTML = items.map((ex) => `
@@ -1030,10 +1317,10 @@ function renderLibrary(screen) {
         <div class="ex-pose small">${POSES[ex.pose]}</div>
         <div class="lib-item-body">
           <h3>${ex.name}</h3>
-          <p class="muted">${CATEGORY_LABELS[ex.category]} · targets ${(ex.targets || []).map((t) => PROBLEM_AREA_LABELS[t] || t).join(", ")}</p>
+          <p class="muted">${CATEGORY_LABELS[ex.category]}${ex.targets && ex.targets.length ? " · targets " + ex.targets.map((t) => PROBLEM_AREA_LABELS[t] || t).join(", ") : ""}</p>
           ${ex.avoidInjuries.length ? `<p class="muted small">Avoid if: ${ex.avoidInjuries.map((a) => INJURY_LABELS[a]).join(", ")}</p>` : ""}
         </div>
-        <span class="lib-item-chevron">&rsaquo;</span>
+        <span class="lib-item-chevron">${iconHTML("chevron-right")}</span>
       </div>`).join("");
   }
   filterBar.querySelectorAll(".chip-toggle").forEach((btn) => {
@@ -1100,14 +1387,14 @@ function renderExerciseHistory() {
 
   screen.innerHTML = `
     <div class="tmpl-head">
-      <button class="btn-icon" onclick="go('library')">&larr;</button>
+      <button class="btn-icon" onclick="go('library')">${iconHTML("chevron-left")}</button>
       <h1>${ex.name}</h1>
       <span></span>
     </div>
 
     <div class="card ex-history-summary">
       <div class="ex-pose ex-history-pose">${POSES[ex.pose]}</div>
-      <p class="muted">${CATEGORY_LABELS[ex.category]} · targets ${(ex.targets || []).map((t) => PROBLEM_AREA_LABELS[t] || t).join(", ")}</p>
+      <p class="muted">${CATEGORY_LABELS[ex.category]}${ex.targets && ex.targets.length ? " · targets " + ex.targets.map((t) => PROBLEM_AREA_LABELS[t] || t).join(", ") : ""}</p>
     </div>
 
     ${pr ? `
@@ -1118,12 +1405,12 @@ function renderExerciseHistory() {
       </div>
 
       <div class="card">
-        <div class="eyebrow">${ex.isHold ? "Hold Time" : "Reps"} Over Time</div>
+        <div class="eyebrow">${iconHTML("trending-up")}<span>${ex.isHold ? "Hold Time" : "Reps"} Over Time</span></div>
         <canvas id="chart-ex-history" class="chart"></canvas>
       </div>
 
       <div class="card">
-        <div class="eyebrow">History</div>
+        <div class="eyebrow">${iconHTML("history")}<span>History</span></div>
         ${entries.slice().reverse().map((e) => `
           <div class="history-row">
             <span>${e.date}</span>
@@ -1240,14 +1527,14 @@ function progressPhotosHTML() {
   if (typeof Auth === "undefined" || !Auth.isAvailable() || !App.user) {
     return `
       <div class="card">
-        <div class="eyebrow">Progress Photos</div>
+        <div class="eyebrow">${iconHTML("camera")}<span>Progress Photos</span></div>
         <p class="muted">Sign in (see Profile) to add and sync progress photos across devices.</p>
       </div>`;
   }
   const photos = Store.getProgressPhotos();
   return `
     <div class="card">
-      <div class="eyebrow">Progress Photos</div>
+      <div class="eyebrow">${iconHTML("camera")}<span>Progress Photos</span></div>
       <input type="file" accept="image/*" id="photo-input" style="display:none">
       <button class="btn btn-secondary btn-block" id="add-photo-btn">Add Photo</button>
       <div class="auth-error" id="photo-error"></div>
@@ -1380,17 +1667,17 @@ function renderAnalytics(screen) {
     </div>
 
     <div class="card">
-      <div class="eyebrow">Weight Trend</div>
+      <div class="eyebrow">${iconHTML("trending-down")}<span>Weight Trend</span></div>
       <canvas id="chart-weight" class="chart"></canvas>
     </div>
 
     <div class="card">
-      <div class="eyebrow">BMI</div>
+      <div class="eyebrow">${iconHTML("scale")}<span>BMI</span></div>
       <div class="big-metric">${bmi ? bmi.toFixed(1) : "—"} <span class="tag tag-${cat.tone}">${cat.label}</span></div>
     </div>
 
     <div class="card">
-      <div class="eyebrow">Fitness Level</div>
+      <div class="eyebrow">${iconHTML("zap")}<span>Fitness Level</span></div>
       <div class="two-col">
         <div><span class="stat-num">${latest.pushups}</span><span class="stat-label">Push-ups (${fit.pushupLevel})</span></div>
         <div><span class="stat-num">${latest.pullups}</span><span class="stat-label">Pull-ups (${fit.pullupLevel})</span></div>
@@ -1401,12 +1688,12 @@ function renderAnalytics(screen) {
     </div>
 
     <div class="card">
-      <div class="eyebrow">Push-up / Pull-up Progression</div>
+      <div class="eyebrow">${iconHTML("trending-up")}<span>Push-up / Pull-up Progression</span></div>
       <canvas id="chart-strength" class="chart"></canvas>
     </div>
 
     <div class="card">
-      <div class="eyebrow">Strength Gains</div>
+      <div class="eyebrow">${iconHTML("trending-up")}<span>Strength Gains</span></div>
       ${strengthGains.length ? strengthGains.map(({ ex, pr }) => `
         <div class="sgain-row" onclick="viewExerciseHistory('${ex.id}')">
           <div class="sgain-info">
@@ -1419,12 +1706,12 @@ function renderAnalytics(screen) {
     </div>
 
     <div class="card">
-      <div class="eyebrow">Weekly Volume by Muscle Group</div>
+      <div class="eyebrow">${iconHTML("bar-chart-3")}<span>Weekly Volume by Muscle Group</span></div>
       <canvas id="chart-muscle-volume" class="chart"></canvas>
     </div>
 
     <div class="card">
-      <div class="eyebrow">Training Volume by Day of Week</div>
+      <div class="eyebrow">${iconHTML("calendar-days")}<span>Training Volume by Day of Week</span></div>
       <div class="weekday-heatmap">
         ${WEEKDAY_LABELS.map((label, i) => {
           const v = weekdayVolume[i];
@@ -1439,14 +1726,14 @@ function renderAnalytics(screen) {
     </div>
 
     <div class="card">
-      <div class="eyebrow">Workout Frequency — Current vs Prescribed</div>
+      <div class="eyebrow">${iconHTML("bar-chart")}<span>Workout Frequency — Current vs Prescribed</span></div>
       <canvas id="chart-freq" class="chart"></canvas>
     </div>
 
     ${progressPhotosHTML()}
 
     <div class="card">
-      <div class="eyebrow">Recent Workouts</div>
+      <div class="eyebrow">${iconHTML("list")}<span>Recent Workouts</span></div>
       ${db.workoutHistory.slice().reverse().slice(0, 8).map((w) => `
         <div class="history-row"><span>${w.date}</span><span>${w.durationMin} min</span><span>${w.completionPct}%</span></div>
       `).join("") || `<p class="muted">No workouts logged yet.</p>`}
@@ -1519,7 +1806,7 @@ function renderSettings(screen) {
     </div>
 
     <div class="card">
-      <div class="eyebrow">Log Today's Weight (${profile.units === "metric" ? "kg" : "lb"})</div>
+      <div class="eyebrow">${iconHTML("scale")}<span>Log Today's Weight (${profile.units === "metric" ? "kg" : "lb"})</span></div>
       <div class="row2">
         <input class="input" id="new-weight" type="number">
         <button class="btn btn-primary" id="save-weight-btn">Save</button>
@@ -1527,7 +1814,7 @@ function renderSettings(screen) {
     </div>
 
     <div class="card">
-      <div class="eyebrow">Danger Zone</div>
+      <div class="eyebrow">${iconHTML("alert-triangle")}<span>Danger Zone</span></div>
       <button class="btn btn-danger btn-block" id="reset-btn">Reset All Data</button>
     </div>
   `;
@@ -1557,25 +1844,25 @@ function accountCardHTML() {
   if (typeof Auth === "undefined" || !Auth.isAvailable()) {
     return `
       <div class="card">
-        <div class="eyebrow">Account</div>
+        <div class="eyebrow">${iconHTML("user-circle")}<span>Account</span></div>
         <p class="muted">Sign-in isn't configured for this install — your data stays on this device only.</p>
       </div>`;
   }
   if (App.user) {
     return `
       <div class="card">
-        <div class="eyebrow">Account</div>
+        <div class="eyebrow">${iconHTML("user-circle")}<span>Account</span></div>
         <p>${escapeHtml(App.user.email)} <span class="tag sync-tag-${Sync.status}">${syncStatusLabel(Sync.status)}</span></p>
         <button class="btn btn-secondary btn-block" id="signout-btn">Sign Out</button>
       </div>`;
   }
   return `
     <div class="card">
-      <div class="eyebrow">Account</div>
+      <div class="eyebrow">${iconHTML("user-circle")}<span>Account</span></div>
       <p class="muted">Optional — sign in to sync your data across devices. The app fully works offline without one.</p>
       <div class="oauth-row">
-        <button class="btn btn-secondary btn-block" id="oauth-google-btn">Continue with Google</button>
-        <button class="btn btn-secondary btn-block" id="oauth-github-btn">Continue with GitHub</button>
+        <button class="btn btn-secondary btn-block oauth-btn" id="oauth-google-btn">${ICON_GOOGLE}<span>Continue with Google</span></button>
+        <button class="btn btn-secondary btn-block oauth-btn" id="oauth-github-btn">${ICON_GITHUB}<span>Continue with GitHub</span></button>
       </div>
       <div class="auth-divider"><span>or use email</span></div>
       <input class="input" id="auth-email" type="email" placeholder="Email" autocomplete="email">

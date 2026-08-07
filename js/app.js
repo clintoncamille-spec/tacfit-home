@@ -110,6 +110,10 @@ const ICONS = {
   "alert-triangle": `<path d="M12 4.5 21 19.5H3Z"/><path d="M12 10v4.5M12 17h.01"/>`,
   history: `<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l3 2"/><path d="M4.5 8.5A8 8 0 0 1 8 5"/><path d="M3 4v4h4"/>`,
   "play-circle": `<circle cx="12" cy="12" r="8.5"/><path d="M10 8.5v7l6-3.5Z"/>`,
+  edit: `<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z"/><path d="M14.5 5.5l4 4"/>`,
+  trash: `<path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>`,
+  download: `<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 19h16"/>`,
+  "log-out": `<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M15 16l5-4-5-4"/><path d="M20 12H10"/>`,
 };
 
 function iconHTML(name) {
@@ -201,8 +205,8 @@ function renderOnboarding() {
 
 function onbNav(idx, total) {
   return `<div class="onb-nav">
-    ${idx > 0 ? `<button class="btn btn-secondary" data-nav="back">Back</button>` : `<span></span>`}
-    <button class="btn btn-primary" data-nav="next">${idx === total - 1 ? "Create My Plan" : "Continue"}</button>
+    ${idx > 0 ? `<button class="btn btn-secondary" data-nav="back">${iconHTML("chevron-left")}<span>Back</span></button>` : `<span></span>`}
+    <button class="btn btn-primary" data-nav="next">${idx === total - 1 ? `${iconHTML("check")}<span>Create My Plan</span>` : `${iconHTML("chevron-right")}<span>Continue</span>`}</button>
   </div>`;
 }
 
@@ -520,8 +524,8 @@ function renderDashboard(screen) {
         <div class="plan-meta">${day ? day.exercises.length + " exercises · ~" + profile.duration + " min" : ""}</div>
       </div>
       ${day ? planChecklistHTML(day, activeSessionForToday) : `<p class="muted">No plan yet — check your Profile to set a frequency.</p>`}
-      ${day ? `<button class="btn btn-primary btn-block" onclick="startWorkout(${day.dayIndex})">${activeSessionForToday ? "Resume Workout" : "Start Workout"}</button>` : ""}
-      <button class="btn btn-secondary btn-block" onclick="go('templates')">Start From Template</button>
+      ${day ? `<button class="btn btn-primary btn-block" onclick="startWorkout(${day.dayIndex})">${iconHTML("play-circle")}<span>${activeSessionForToday ? "Resume Workout" : "Start Workout"}</span></button>` : ""}
+      <button class="btn btn-secondary btn-block" onclick="go('templates')">${iconHTML("list")}<span>Start From Template</span></button>
     </div>
 
     <div class="card">
@@ -646,8 +650,8 @@ function logWeightModalHTML() {
         <input class="input" id="quick-weight-input" type="number">
         <div class="auth-error" id="quick-weight-error"></div>
         <div class="row2">
-          <button class="btn btn-secondary" onclick="closeLogWeightModal()">Cancel</button>
-          <button class="btn btn-primary" id="quick-weight-save-btn">Save</button>
+          <button class="btn btn-secondary" onclick="closeLogWeightModal()">${iconHTML("x")}<span>Cancel</span></button>
+          <button class="btn btn-primary" id="quick-weight-save-btn">${iconHTML("check")}<span>Save</span></button>
         </div>
       </div>
     </div>`;
@@ -701,8 +705,8 @@ function customExerciseModalHTML() {
         </div>
         <div class="auth-error" id="custom-ex-error"></div>
         <div class="row2">
-          <button class="btn btn-secondary" onclick="closeCustomExerciseModal()">Cancel</button>
-          <button class="btn btn-primary" id="custom-ex-save-btn">Save</button>
+          <button class="btn btn-secondary" onclick="closeCustomExerciseModal()">${iconHTML("x")}<span>Cancel</span></button>
+          <button class="btn btn-primary" id="custom-ex-save-btn">${iconHTML("check")}<span>Save</span></button>
         </div>
       </div>
     </div>`;
@@ -795,8 +799,8 @@ function accountBannerHTML() {
     <div class="card account-banner">
       <p>Create a free account to sync your progress across devices.</p>
       <div class="row2">
-        <button class="btn btn-secondary" onclick="dismissAccountBanner()">Not now</button>
-        <button class="btn btn-primary" onclick="go('settings')">Set Up</button>
+        <button class="btn btn-secondary" onclick="dismissAccountBanner()">${iconHTML("x")}<span>Not now</span></button>
+        <button class="btn btn-primary" onclick="go('settings')">${iconHTML("chevron-right")}<span>Set Up</span></button>
       </div>
     </div>`;
 }
@@ -840,7 +844,7 @@ function renderSession() {
       <div class="exercise-list">
         ${session.exercises.map((se, i) => sessionExerciseCard(se, i)).join("")}
       </div>
-      <button class="btn btn-primary btn-block finish-btn" onclick="finishWorkout()">Finish Workout</button>
+      <button class="btn btn-primary btn-block finish-btn" onclick="finishWorkout()">${iconHTML("check")}<span>Finish Workout</span></button>
     </div>
     ${App.restActive ? restModalHTML() : ""}
   `;
@@ -923,7 +927,7 @@ function restModalHTML() {
         <div class="card rest-modal rest-modal-done">
           <div class="rest-modal-icon">${iconHTML("check")}</div>
           <div class="rest-modal-headline">Rest Over!</div>
-          <button class="btn btn-primary btn-block" onclick="closeRestModal()">Continue</button>
+          <button class="btn btn-primary btn-block" onclick="closeRestModal()">${iconHTML("chevron-right")}<span>Continue</span></button>
         </div>
       </div>`;
   }
@@ -939,7 +943,7 @@ function restModalHTML() {
           <button class="btn btn-secondary" onclick="adjustRest(-15)">${iconHTML("minus")}<span>15s</span></button>
           <button class="btn btn-secondary" onclick="adjustRest(15)">${iconHTML("plus")}<span>15s</span></button>
         </div>
-        <button class="btn btn-secondary btn-block" onclick="skipRest()">Skip Rest</button>
+        <button class="btn btn-secondary btn-block" onclick="skipRest()">${iconHTML("chevron-right")}<span>Skip Rest</span></button>
       </div>
     </div>`;
 }
@@ -1109,10 +1113,10 @@ function templateCardHTML(t) {
       <h3 class="tmpl-name">${escapeHtml(t.name)}</h3>
       <div class="chip-row">${t.exercises.map((ex) => `<span class="chip">${exerciseById(ex.exerciseId).name}</span>`).join("")}</div>
       <div class="row2">
-        <button class="btn btn-secondary" onclick="editTemplate('${t.id}')">Edit</button>
-        <button class="btn btn-primary" onclick="startWorkoutFromTemplate('${t.id}')">Start</button>
+        <button class="btn btn-secondary" onclick="editTemplate('${t.id}')">${iconHTML("edit")}<span>Edit</span></button>
+        <button class="btn btn-primary" onclick="startWorkoutFromTemplate('${t.id}')">${iconHTML("play-circle")}<span>Start</span></button>
       </div>
-      <button class="btn btn-danger btn-block" onclick="deleteTemplateConfirm('${t.id}')">Delete</button>
+      <button class="btn btn-danger btn-block" onclick="deleteTemplateConfirm('${t.id}')">${iconHTML("trash")}<span>Delete</span></button>
     </div>`;
 }
 
@@ -1165,7 +1169,7 @@ function renderTemplateEditor(screen) {
     ${App.templatePickerOpen ? templatePickerHTML(draft) : ""}
 
     <div class="auth-error" id="tmpl-error"></div>
-    <button class="btn btn-primary btn-block" id="tmpl-save-btn">Save Template</button>
+    <button class="btn btn-primary btn-block" id="tmpl-save-btn">${iconHTML("check")}<span>Save Template</span></button>
   `;
   bindTemplateEditorEvents(screen);
 }
@@ -1536,7 +1540,7 @@ function progressPhotosHTML() {
     <div class="card">
       <div class="eyebrow">${iconHTML("camera")}<span>Progress Photos</span></div>
       <input type="file" accept="image/*" id="photo-input" style="display:none">
-      <button class="btn btn-secondary btn-block" id="add-photo-btn">Add Photo</button>
+      <button class="btn btn-secondary btn-block" id="add-photo-btn">${iconHTML("camera")}<span>Add Photo</span></button>
       <div class="auth-error" id="photo-error"></div>
       <div class="photo-gallery">
         ${photos.length ? photos.slice().reverse().map((p) => `
@@ -1616,8 +1620,8 @@ function photoLightboxHTML() {
         ${App.photoLightboxUrl ? `<img id="photo-lightbox-img" src="${App.photoLightboxUrl}" class="photo-lightbox-img" alt="Progress photo ${photo.date}">` : `<p class="muted">Loading…</p>`}
         <p class="muted">${photo.date}</p>
         <div class="row2">
-          <button class="btn btn-danger" onclick="deleteProgressPhotoConfirm('${photo.id}')">Delete</button>
-          <button class="btn btn-primary" onclick="closePhotoLightbox()">Close</button>
+          <button class="btn btn-danger" onclick="deleteProgressPhotoConfirm('${photo.id}')">${iconHTML("trash")}<span>Delete</span></button>
+          <button class="btn btn-primary" onclick="closePhotoLightbox()">${iconHTML("x")}<span>Close</span></button>
         </div>
       </div>
     </div>`;
@@ -1663,7 +1667,7 @@ function renderAnalytics(screen) {
   screen.innerHTML = `
     <div class="header header-with-action">
       <h1>Progress</h1>
-      <button class="btn btn-secondary" id="export-csv-btn">Export CSV</button>
+      <button class="btn btn-secondary" id="export-csv-btn">${iconHTML("download")}<span>Export CSV</span></button>
     </div>
 
     <div class="card">
@@ -1683,7 +1687,7 @@ function renderAnalytics(screen) {
         <div><span class="stat-num">${latest.pullups}</span><span class="stat-label">Pull-ups (${fit.pullupLevel})</span></div>
       </div>
       <p class="muted">${fitnessVsBmiInsight(bmi, fit)}</p>
-      <button class="btn btn-secondary btn-block" id="log-test-btn">Log New Test</button>
+      <button class="btn btn-secondary btn-block" id="log-test-btn">${iconHTML("plus")}<span>Log New Test</span></button>
       <div id="test-form"></div>
     </div>
 
@@ -1769,7 +1773,7 @@ function renderAnalytics(screen) {
         <input class="input" id="new-pushups" type="number" placeholder="Push-ups">
         <input class="input" id="new-pullups" type="number" placeholder="Pull-ups">
       </div>
-      <button class="btn btn-primary btn-block" id="save-test-btn">Save Test</button>
+      <button class="btn btn-primary btn-block" id="save-test-btn">${iconHTML("check")}<span>Save Test</span></button>
     `;
     document.getElementById("save-test-btn").addEventListener("click", () => {
       const pu = Number(document.getElementById("new-pushups").value) || 0;
@@ -1802,20 +1806,20 @@ function renderSettings(screen) {
         <div class="review-item"><span>Frequency</span><b>${profile.prescribedFrequency}x/week · ${profile.duration}min</b></div>
         <div class="review-item"><span>Injuries</span><b>${(profile.injuries || []).map((a) => INJURY_LABELS[a]).join(", ") || "None"}</b></div>
       </div>
-      <button class="btn btn-secondary btn-block" onclick="editProfile()">Edit Full Profile</button>
+      <button class="btn btn-secondary btn-block" onclick="editProfile()">${iconHTML("edit")}<span>Edit Full Profile</span></button>
     </div>
 
     <div class="card">
       <div class="eyebrow">${iconHTML("scale")}<span>Log Today's Weight (${profile.units === "metric" ? "kg" : "lb"})</span></div>
       <div class="row2">
         <input class="input" id="new-weight" type="number">
-        <button class="btn btn-primary" id="save-weight-btn">Save</button>
+        <button class="btn btn-primary" id="save-weight-btn">${iconHTML("check")}<span>Save</span></button>
       </div>
     </div>
 
     <div class="card">
       <div class="eyebrow">${iconHTML("alert-triangle")}<span>Danger Zone</span></div>
-      <button class="btn btn-danger btn-block" id="reset-btn">Reset All Data</button>
+      <button class="btn btn-danger btn-block" id="reset-btn">${iconHTML("trash")}<span>Reset All Data</span></button>
     </div>
   `;
   document.getElementById("save-weight-btn").addEventListener("click", () => {
@@ -1853,7 +1857,7 @@ function accountCardHTML() {
       <div class="card">
         <div class="eyebrow">${iconHTML("user-circle")}<span>Account</span></div>
         <p>${escapeHtml(App.user.email)} <span class="tag sync-tag-${Sync.status}">${syncStatusLabel(Sync.status)}</span></p>
-        <button class="btn btn-secondary btn-block" id="signout-btn">Sign Out</button>
+        <button class="btn btn-secondary btn-block" id="signout-btn">${iconHTML("log-out")}<span>Sign Out</span></button>
       </div>`;
   }
   return `
@@ -1870,8 +1874,8 @@ function accountCardHTML() {
       <input class="input" id="auth-password" type="password" placeholder="At least 6 characters" autocomplete="current-password">
       <div class="auth-error" id="auth-error"></div>
       <div class="row2">
-        <button class="btn btn-secondary" id="signup-btn">Sign Up</button>
-        <button class="btn btn-primary" id="signin-btn">Log In</button>
+        <button class="btn btn-secondary" id="signup-btn">${iconHTML("plus")}<span>Sign Up</span></button>
+        <button class="btn btn-primary" id="signin-btn">${iconHTML("chevron-right")}<span>Log In</span></button>
       </div>
     </div>`;
 }

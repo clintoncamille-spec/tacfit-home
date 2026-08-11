@@ -120,19 +120,6 @@ function iconHTML(name) {
   return `<svg class="icon" viewBox="0 0 24 24">${ICONS[name] || ""}</svg>`;
 }
 
-// Real brand marks for the two OAuth buttons — deliberately not run through the outline-only
-// .icon system, since generic monochrome icons would misrepresent these third-party sign-in
-// buttons (standard practice everywhere "Continue with X" appears).
-const ICON_GOOGLE = `<svg class="icon-brand" viewBox="0 0 24 24">
-  <path fill="#4285F4" d="M22.5 12.2c0-.8-.1-1.5-.2-2.2H12v4.3h5.9c-.3 1.4-1 2.5-2.2 3.3v2.7h3.6c2.1-1.9 3.2-4.8 3.2-8.1Z"/>
-  <path fill="#34A853" d="M12 23c2.9 0 5.4-1 7.2-2.6l-3.6-2.7c-1 .7-2.2 1.1-3.6 1.1-2.8 0-5.1-1.9-6-4.4H2.3v2.8C4.1 20.6 7.8 23 12 23Z"/>
-  <path fill="#FBBC05" d="M6 14.4c-.2-.7-.3-1.4-.3-2.1s.1-1.4.3-2.1V7.4H2.3A11 11 0 0 0 1 12.3c0 1.8.4 3.5 1.3 5l3.7-2.9Z"/>
-  <path fill="#EA4335" d="M12 5.4c1.6 0 3 .5 4.1 1.6l3.1-3.1C17.4 2.2 14.9 1 12 1 7.8 1 4.1 3.4 2.3 7.4l3.7 2.9c.9-2.5 3.2-4.9 6-4.9Z"/>
-</svg>`;
-const ICON_GITHUB = `<svg class="icon-brand" viewBox="0 0 24 24" fill="currentColor">
-  <path d="M12 .5C5.7.5.8 5.4.8 11.8c0 5.1 3.3 9.4 7.9 11 .6.1.8-.3.8-.6v-2.2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.5-.3-5.2-1.3-5.2-5.6 0-1.2.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.1 0 4.3-2.7 5.3-5.2 5.6.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.6 7.9-5.9 7.9-11C23.2 5.4 18.3.5 12 .5Z"/>
-</svg>`;
-
 // ---------- Onboarding ----------
 
 const GOAL_OPTIONS = [
@@ -631,7 +618,7 @@ function planChecklistHTML(day, activeSessionForToday) {
         return `
           <div class="session-row">
             <span class="session-check ${state}">${icon}</span>
-            <span class="session-name">${meta.name}</span>
+            <span class="session-name">${escapeHtml(meta.name)}</span>
             <span class="session-target">${ex.sets} × ${ex.reps}${meta.isHold ? "s" : ""}</span>
           </div>`;
       }).join("")}
@@ -861,7 +848,7 @@ function sessionExerciseCard(se, i) {
       <div class="ex-card-head">
         <div class="ex-pose">${POSES[ex.pose]}${allDone ? `<span class="complete-badge">${iconHTML("check")}</span>` : ""}</div>
         <div>
-          <h3>${ex.name}</h3>
+          <h3>${escapeHtml(ex.name)}</h3>
           <p class="muted">${se.sets} sets × ${se.reps}${ex.isHold ? " sec" : " reps"}</p>
         </div>
       </div>
@@ -1111,7 +1098,7 @@ function templateCardHTML(t) {
   return `
     <div class="card">
       <h3 class="tmpl-name">${escapeHtml(t.name)}</h3>
-      <div class="chip-row">${t.exercises.map((ex) => `<span class="chip">${exerciseById(ex.exerciseId).name}</span>`).join("")}</div>
+      <div class="chip-row">${t.exercises.map((ex) => `<span class="chip">${escapeHtml(exerciseById(ex.exerciseId).name)}</span>`).join("")}</div>
       <div class="row2">
         <button class="btn btn-secondary" onclick="editTemplate('${t.id}')">${iconHTML("edit")}<span>Edit</span></button>
         <button class="btn btn-primary" onclick="startWorkoutFromTemplate('${t.id}')">${iconHTML("play-circle")}<span>Start</span></button>
@@ -1182,7 +1169,7 @@ function tmplExerciseRowHTML(ex, i, total) {
         <button class="btn-icon tmpl-move-btn" ${i === 0 ? "disabled" : ""} onclick="moveDraftExercise(${i}, -1)">${iconHTML("chevron-up")}</button>
         <button class="btn-icon tmpl-move-btn" ${i === total - 1 ? "disabled" : ""} onclick="moveDraftExercise(${i}, 1)">${iconHTML("chevron-down")}</button>
       </div>
-      <div class="tmpl-ex-row-name">${meta.name}</div>
+      <div class="tmpl-ex-row-name">${escapeHtml(meta.name)}</div>
       <div class="tmpl-ex-row-fields">
         <input class="input" type="number" min="1" value="${ex.sets}" onchange="updateDraftExerciseField(${i}, 'sets', this.value)">
         <span class="muted">sets</span>
@@ -1215,7 +1202,7 @@ function templatePickerHTML(draft) {
         <div class="card lib-item tmpl-picker-item ${usedIds.has(ex.id) ? "added" : ""}" data-ex="${ex.id}">
           <div class="ex-pose small">${POSES[ex.pose]}</div>
           <div class="lib-item-body">
-            <h3>${ex.name}</h3>
+            <h3>${escapeHtml(ex.name)}</h3>
             <p class="muted">${CATEGORY_LABELS[ex.category]}</p>
           </div>
           ${usedIds.has(ex.id) ? `<span class="muted small">Added</span>` : ""}
@@ -1286,11 +1273,23 @@ function saveTemplateDraft() {
   renderTemplates();
 }
 
+// Template sessions need a real (non-null) dayIndex — workout_history.day_index is NOT NULL
+// in supabase/schema.sql, so `null` here would make Sync.pushLocal's upsert throw and block
+// syncing the user's entire workout history, not just this row. Deriving a stable negative
+// int per template id keeps each template's workouts collapsing to one record per day (same
+// semantics as a plan day), while staying clear of real plan dayIndex values (always 0-6) and
+// distinct from other templates.
+function templateSyntheticDayIndex(templateId) {
+  let hash = 5381;
+  for (let i = 0; i < templateId.length; i++) hash = ((hash << 5) + hash + templateId.charCodeAt(i)) | 0;
+  return -Math.abs(hash) - 1000;
+}
+
 function startWorkoutFromTemplate(templateId) {
   const template = Store.getTemplates().find((t) => t.id === templateId);
   if (!template) return;
   const session = {
-    dayIndex: null,
+    dayIndex: templateSyntheticDayIndex(template.id),
     templateId: template.id,
     startedAt: Date.now(),
     exercises: template.exercises.map((ex) => ({ exerciseId: ex.exerciseId, sets: ex.sets, reps: ex.reps, done: new Array(ex.sets).fill(false), warmup: new Array(ex.sets).fill(false) })),
@@ -1320,7 +1319,7 @@ function renderLibrary(screen) {
       <div class="card lib-item" onclick="viewExerciseHistory('${ex.id}')">
         <div class="ex-pose small">${POSES[ex.pose]}</div>
         <div class="lib-item-body">
-          <h3>${ex.name}</h3>
+          <h3>${escapeHtml(ex.name)}</h3>
           <p class="muted">${CATEGORY_LABELS[ex.category]}${ex.targets && ex.targets.length ? " · targets " + ex.targets.map((t) => PROBLEM_AREA_LABELS[t] || t).join(", ") : ""}</p>
           ${ex.avoidInjuries.length ? `<p class="muted small">Avoid if: ${ex.avoidInjuries.map((a) => INJURY_LABELS[a]).join(", ")}</p>` : ""}
         </div>
@@ -1392,7 +1391,7 @@ function renderExerciseHistory() {
   screen.innerHTML = `
     <div class="tmpl-head">
       <button class="btn-icon" onclick="go('library')">${iconHTML("chevron-left")}</button>
-      <h1>${ex.name}</h1>
+      <h1>${escapeHtml(ex.name)}</h1>
       <span></span>
     </div>
 
@@ -1701,7 +1700,7 @@ function renderAnalytics(screen) {
       ${strengthGains.length ? strengthGains.map(({ ex, pr }) => `
         <div class="sgain-row" onclick="viewExerciseHistory('${ex.id}')">
           <div class="sgain-info">
-            <h3>${ex.name}</h3>
+            <h3>${escapeHtml(ex.name)}</h3>
             <p class="muted">${pr.bestReps}${ex.isHold ? "s" : " reps"} best · ${pr.timesPerformed}× done</p>
           </div>
           <canvas class="sgain-spark" id="spark-${ex.id}"></canvas>
@@ -1864,11 +1863,6 @@ function accountCardHTML() {
     <div class="card">
       <div class="eyebrow">${iconHTML("user-circle")}<span>Account</span></div>
       <p class="muted">Optional — sign in to sync your data across devices. The app fully works offline without one.</p>
-      <div class="oauth-row">
-        <button class="btn btn-secondary btn-block oauth-btn" id="oauth-google-btn">${ICON_GOOGLE}<span>Continue with Google</span></button>
-        <button class="btn btn-secondary btn-block oauth-btn" id="oauth-github-btn">${ICON_GITHUB}<span>Continue with GitHub</span></button>
-      </div>
-      <div class="auth-divider"><span>or use email</span></div>
       <input class="input" id="auth-email" type="email" placeholder="Email" autocomplete="email">
       <label class="field-label">Password</label>
       <input class="input" id="auth-password" type="password" placeholder="At least 6 characters" autocomplete="current-password">
@@ -1896,19 +1890,6 @@ function bindAccountCardEvents(screen) {
   const signInBtn = document.getElementById("signin-btn");
   if (signUpBtn) signUpBtn.addEventListener("click", () => handleAuthSubmit(screen, "signUp"));
   if (signInBtn) signInBtn.addEventListener("click", () => handleAuthSubmit(screen, "signIn"));
-
-  const googleBtn = document.getElementById("oauth-google-btn");
-  const githubBtn = document.getElementById("oauth-github-btn");
-  if (googleBtn) googleBtn.addEventListener("click", () => handleOAuthClick("google"));
-  if (githubBtn) githubBtn.addEventListener("click", () => handleOAuthClick("github"));
-}
-
-async function handleOAuthClick(provider) {
-  const errBox = document.getElementById("auth-error");
-  if (errBox) errBox.textContent = "";
-  const result = await Auth.signInWithProvider(provider);
-  // On success the browser navigates away to the provider — nothing else to render here.
-  if (result.error && errBox) errBox.textContent = result.error;
 }
 
 async function handleAuthSubmit(screen, method) {

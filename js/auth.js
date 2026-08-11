@@ -44,18 +44,6 @@ const Auth = {
     await supabaseClient.auth.signOut();
     this._notify(null);
   },
-
-  // Redirects the whole page to the provider's login; there's no user to return here —
-  // Auth._notify fires later from onAuthStateChange once the redirect back completes.
-  async signInWithProvider(provider) {
-    if (!supabaseClient) return { error: "Sign-in isn't available on this install." };
-    const { error } = await supabaseClient.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: window.location.origin + window.location.pathname },
-    });
-    if (error) return { error: error.message };
-    return {};
-  },
 };
 
 if (supabaseClient) {

@@ -1,0 +1,20 @@
+{
+  "name": "tacfit-home",
+  "version": "1.0.0",
+  "description": "Offline military-style bodyweight workouts, tailored to you.",
+  "private": true,
+  "scripts": {
+    "sync:web": "rsync -a --delete index.html manifest.json sw.js css js icons www/",
+    "cap:sync": "npm run sync:web && cap sync",
+    "cap:android": "npm run sync:web && cap open android",
+    "cap:ios": "npm run sync:web && cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/ios": "^8.5.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.0"
+  }
+}

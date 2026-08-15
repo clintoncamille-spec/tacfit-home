@@ -1,0 +1,18 @@
+node_modules/
+www/
+
+# Android
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/captures/
+android/.idea/
+android/app/src/main/assets/public/
+
+# iOS
+ios/App/Pods/
+ios/App/build/
+ios/App/App/public/
+ios/DerivedData/
+ios/.xcode.env.local

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TacFit Home</string>
+    <string name="title_activity_main">TacFit Home</string>
+    <string name="package_name">com.billscrub.tacfithome</string>
+    <string name="custom_url_scheme">com.billscrub.tacfithome</string>
+</resources>

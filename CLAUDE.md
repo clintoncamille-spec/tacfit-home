@@ -37,3 +37,13 @@ The web app itself is still zero-build-step — `ios/` and `android/` are an *ad
 - **iOS has no CocoaPods/Podfile** — Capacitor 8 wires plugins through Swift Package Manager (`ios/App/CapApp-SPM`) instead.
 - **Building iOS requires full Xcode.app** (not just Command Line Tools) — install it from the App Store, then `npm run cap:ios` to open the workspace.
 - **Building Android**: Android Studio bundles its own JDK (no system-wide `java`/`gradle` needed) — either open the project in Android Studio directly, or from the CLI: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew assembleDebug` from `android/`.
+
+## Windows desktop app (Electron)
+
+`electron/main.js` wraps the same `www/` assets in a desktop shell — no rewrite, same `sync:web` step as the mobile apps. Unlike Capacitor's `file://`-style loading, `main.js` spins up a tiny local `http.createServer()` (Node built-in, no dependencies) on a random port and loads `http://127.0.0.1:<port>` in the `BrowserWindow`, so `fetch()`/`localStorage`/relative asset paths all behave exactly like a real browser — no app code had to change.
+
+- **`npm run electron:start`** — sync web assets, launch in dev mode (works on macOS too, since Electron's renderer is the same Chromium engine cross-platform — useful for testing this shell without needing Windows).
+- **`npm run electron:build:win`** — packages a portable Windows x64 `.exe` via `@electron/packager` into `dist/` (gitignored — it's a build artifact, regenerate with this command rather than expecting it in the repo). No installer/NSIS step, so it doesn't need Wine to cross-build from macOS — just unzip and run `TacFitHome.exe` on Windows, no install required.
+- **Icon**: `electron/icon.ico` is a hand-packed multi-resolution ICO (16 through 256px), built once from `icons/icon-512.png` via `electron/build-resources/make-ico.js` (plain Node, no image library — ICO's format supports embedding PNG frames directly since Vista, so no BMP/DIB conversion needed). Regenerate by re-running that script if the source icon changes.
+- **The packager must exclude `node_modules/`** — the app has zero runtime npm dependencies (only Node built-ins + whatever `electron` itself provides), so bundling `node_modules` would needlessly ship every Capacitor/tooling package inside the `.exe`. The `--ignore` regex in the `electron:build:win` script handles this; if you change that script, keep the exclusion.
+- Verified by actually running the packaged app's exact code via `electron .` in dev mode on macOS (confirmed the internal HTTP server serves the real app correctly) — the `.exe` itself has not been run on real Windows from this environment (no Windows/Wine available here).

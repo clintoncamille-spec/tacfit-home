@@ -33,4 +33,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Required on API 33+ for the LocalNotifications plugin's scheduled reminder to
+         actually display — without it, schedule() succeeds but nothing shows until the
+         user grants this at runtime, which requestPermissions() triggers. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

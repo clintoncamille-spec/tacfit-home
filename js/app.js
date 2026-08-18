@@ -36,6 +36,9 @@ document.addEventListener("DOMContentLoaded", () => {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
+
+  const profile = Store.getProfile();
+  if (profile) Notifications.sync(profile);
 });
 
 function route() {
@@ -425,6 +428,7 @@ function finishOnboarding() {
   Store.logTest(profile.pushupsMax, profile.pullupsMax);
   const plan = buildWeeklyPlan(profile);
   Store.savePlan(plan);
+  Notifications.sync(profile);
   App.draft = {}; App.step = 0;
   go("dashboard");
 }
@@ -488,6 +492,7 @@ function renderDashboard(screen) {
       <p class="muted">${new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</p>
     </div>
 
+    ${reminderBannerHTML(profile, db.workoutHistory)}
     ${accountBannerHTML()}
 
     ${quickActionToolbarHTML()}
@@ -510,7 +515,7 @@ function renderDashboard(screen) {
         </div>
         <div class="plan-meta">${day ? day.exercises.length + " exercises · ~" + profile.duration + " min" : ""}</div>
       </div>
-      ${day ? planChecklistHTML(day, activeSessionForToday) : `<p class="muted">No plan yet — check your Profile to set a frequency.</p>`}
+      ${day ? planChecklistHTML(day, activeSessionForToday, db.workoutHistory) : `<p class="muted">No plan yet — check your Profile to set a frequency.</p>`}
       ${day ? `<button class="btn btn-primary btn-block" onclick="startWorkout(${day.dayIndex})">${iconHTML("play-circle")}<span>${activeSessionForToday ? "Resume Workout" : "Start Workout"}</span></button>` : ""}
       <button class="btn btn-secondary btn-block" onclick="go('templates')">${iconHTML("list")}<span>Start From Template</span></button>
     </div>
@@ -606,7 +611,7 @@ function sparklineSVG(values) {
 
 // ---------- Today's Plan checklist ----------
 
-function planChecklistHTML(day, activeSessionForToday) {
+function planChecklistHTML(day, activeSessionForToday, workoutHistory) {
   return `
     <div class="session-list">
       ${day.exercises.map((ex, i) => {
@@ -615,11 +620,15 @@ function planChecklistHTML(day, activeSessionForToday) {
         const doneCount = se ? se.done.filter(Boolean).length : 0;
         const state = !se || doneCount === 0 ? "pending" : doneCount >= ex.sets ? "done" : "partial";
         const icon = state === "done" ? iconHTML("check") : state === "partial" ? iconHTML("minus") : "";
+        // Shown target reflects the same difficulty-adjusted numbers the session will
+        // actually use once started (see adjustedSetsReps in workout-generator.js), so
+        // the checklist here never disagrees with what you see after tapping Start.
+        const { sets, reps } = se ? { sets: se.sets, reps: se.reps } : adjustedSetsReps(ex.sets, ex.reps, ex.exerciseId, workoutHistory);
         return `
           <div class="session-row">
             <span class="session-check ${state}">${icon}</span>
             <span class="session-name">${escapeHtml(meta.name)}</span>
-            <span class="session-target">${ex.sets} × ${ex.reps}${meta.isHold ? "s" : ""}</span>
+            <span class="session-target">${sets} × ${reps}${meta.isHold ? "s" : ""}</span>
           </div>`;
       }).join("")}
     </div>`;
@@ -797,6 +806,31 @@ function dismissAccountBanner() {
   render();
 }
 
+// The in-app counterpart to Notifications' native daily reminder (see
+// notifications.js) — recomputed live from current streak/weekly-progress data
+// every time the dashboard renders, so unlike the native notification's fixed
+// daily copy, this is never stale. Dismissal is scoped to today's date so it
+// comes back if still relevant tomorrow, rather than being dismissed forever.
+const REMINDER_DISMISS_KEY_PREFIX = "tacfit_reminder_dismissed_";
+
+function reminderBannerHTML(profile, workoutHistory) {
+  if (profile.remindersEnabled === false) return "";
+  if (localStorage.getItem(REMINDER_DISMISS_KEY_PREFIX + todayISO())) return "";
+  const reminder = reminderMessage(profile, workoutHistory);
+  if (!reminder) return "";
+  return `
+    <div class="card reminder-banner">
+      <div class="eyebrow">${iconHTML("activity")}<span>${escapeHtml(reminder.title)}</span></div>
+      <p>${escapeHtml(reminder.body)}</p>
+      <button class="btn btn-secondary btn-block" onclick="dismissReminderBanner()">${iconHTML("x")}<span>Dismiss for Today</span></button>
+    </div>`;
+}
+
+function dismissReminderBanner() {
+  localStorage.setItem(REMINDER_DISMISS_KEY_PREFIX + todayISO(), "1");
+  render();
+}
+
 // ---------- Workout Session ----------
 
 function startWorkout(dayIndex) {
@@ -806,7 +840,10 @@ function startWorkout(dayIndex) {
   const session = db.activeSession && db.activeSession.dayIndex === dayIndex ? db.activeSession : {
     dayIndex,
     startedAt: Date.now(),
-    exercises: day.exercises.map((ex) => ({ exerciseId: ex.exerciseId, sets: ex.sets, reps: ex.reps, done: new Array(ex.sets).fill(false), warmup: new Array(ex.sets).fill(false) })),
+    exercises: day.exercises.map((ex) => {
+      const { sets, reps } = adjustedSetsReps(ex.sets, ex.reps, ex.exerciseId, db.workoutHistory);
+      return { exerciseId: ex.exerciseId, sets, reps, done: new Array(sets).fill(false), warmup: new Array(sets).fill(false), difficulty: null };
+    }),
   };
   Store.saveSession(session);
   go("session");
@@ -861,8 +898,31 @@ function sessionExerciseCard(se, i) {
           </div>
         `).join("")}
       </div>
+      ${allDone ? difficultyPickerHTML(se, i) : ""}
     </div>
   `;
+}
+
+// Feeds adjustedSetsReps (workout-generator.js) — the next time this exercise is
+// started, its reps nudge up or down based on the last few ratings logged here.
+const DIFFICULTY_OPTIONS = [["easy", "Too Easy"], ["ok", "Just Right"], ["hard", "Too Hard"]];
+
+function difficultyPickerHTML(se, i) {
+  return `
+    <div class="difficulty-row">
+      <span class="muted small">How did that feel?</span>
+      <div class="difficulty-btns">
+        ${DIFFICULTY_OPTIONS.map(([val, label]) => `<button class="chip-toggle ${se.difficulty === val ? "on" : ""}" onclick="setDifficulty(${i}, '${val}')">${label}</button>`).join("")}
+      </div>
+    </div>`;
+}
+
+function setDifficulty(exIdx, value) {
+  const db = Store.get();
+  const session = db.activeSession;
+  session.exercises[exIdx].difficulty = value;
+  Store.saveSession(session);
+  renderSession();
 }
 
 function toggleSet(exIdx, setIdx) {
@@ -1064,6 +1124,7 @@ function finishWorkout() {
         setsPrescribed: e.sets,
         reps: e.reps,
         warmupSetsDone: e.done.filter((d, idx) => d && warmup[idx]).length,
+        difficulty: e.difficulty || null,
       };
     }),
     durationMin, completionPct,
@@ -1288,11 +1349,15 @@ function templateSyntheticDayIndex(templateId) {
 function startWorkoutFromTemplate(templateId) {
   const template = Store.getTemplates().find((t) => t.id === templateId);
   if (!template) return;
+  const workoutHistory = Store.get().workoutHistory;
   const session = {
     dayIndex: templateSyntheticDayIndex(template.id),
     templateId: template.id,
     startedAt: Date.now(),
-    exercises: template.exercises.map((ex) => ({ exerciseId: ex.exerciseId, sets: ex.sets, reps: ex.reps, done: new Array(ex.sets).fill(false), warmup: new Array(ex.sets).fill(false) })),
+    exercises: template.exercises.map((ex) => {
+      const { sets, reps } = adjustedSetsReps(ex.sets, ex.reps, ex.exerciseId, workoutHistory);
+      return { exerciseId: ex.exerciseId, sets, reps, done: new Array(sets).fill(false), warmup: new Array(sets).fill(false), difficulty: null };
+    }),
   };
   Store.saveSession(session);
   go("session");
@@ -1817,10 +1882,21 @@ function renderSettings(screen) {
     </div>
 
     <div class="card">
+      <div class="eyebrow">${iconHTML("activity")}<span>Reminders</span></div>
+      <p class="muted">A daily nudge if you haven't logged a workout yet, timed to your preferred ${profile.timeOfDay || "flexible"} time slot.</p>
+      <div class="segmented">
+        <button class="seg ${profile.remindersEnabled !== false ? "on" : ""}" id="reminders-on-btn">On</button>
+        <button class="seg ${profile.remindersEnabled === false ? "on" : ""}" id="reminders-off-btn">Off</button>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="eyebrow">${iconHTML("alert-triangle")}<span>Danger Zone</span></div>
       <button class="btn btn-danger btn-block" id="reset-btn">${iconHTML("trash")}<span>Reset All Data</span></button>
     </div>
   `;
+  document.getElementById("reminders-on-btn").addEventListener("click", () => setRemindersEnabled(profile, screen, true));
+  document.getElementById("reminders-off-btn").addEventListener("click", () => setRemindersEnabled(profile, screen, false));
   document.getElementById("save-weight-btn").addEventListener("click", () => {
     const raw = Number(document.getElementById("new-weight").value);
     if (!raw) return;
@@ -1839,6 +1915,14 @@ function renderSettings(screen) {
     }
   });
   bindAccountCardEvents(screen);
+}
+
+function setRemindersEnabled(profile, screen, enabled) {
+  profile.remindersEnabled = enabled;
+  profile.updatedAt = todayISO();
+  Store.saveProfile(profile);
+  Notifications.sync(profile);
+  renderSettings(screen);
 }
 
 // ---------- Account (optional sign-in / sync) ----------

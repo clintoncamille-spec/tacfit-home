@@ -258,6 +258,9 @@ body {
 .set-check .dot-ind { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.5; }
 .set-check.on .dot-ind { opacity: 1; }
 .finish-btn { margin-top: 8px; }
+.difficulty-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); animation: fadeUp 0.25s var(--ease); }
+.difficulty-btns { display: flex; gap: 8px; margin-top: 8px; }
+.difficulty-btns .chip-toggle { flex: 1; text-align: center; }
 
 /* Library */
 .chip-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
@@ -293,6 +296,8 @@ body {
 
 /* Account / sync */
 .account-banner p { margin: 0 0 4px; font-size: 14px; }
+.reminder-banner { border-color: var(--warn); }
+.reminder-banner p { margin: 0 0 12px; font-size: 14px; }
 .auth-error { color: var(--danger); font-size: 12.5px; min-height: 16px; margin: 8px 0 2px; }
 .sync-tag-idle { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
 .sync-tag-syncing { background: var(--border); color: var(--text-dim); }

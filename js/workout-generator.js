@@ -78,6 +78,42 @@ function scaleFor(exercise, profile) {
   return { sets, reps: adjustedReps };
 }
 
+// Adaptive difficulty: looks at the most recent "Too Easy / Just Right / Too Hard"
+// ratings logged for this exercise (see sessionExerciseCard/finishWorkout in app.js)
+// and nudges reps up or down for the *next* time this exercise is started. Applied
+// fresh to the static plan/template numbers each time a session starts (not
+// compounded onto a previously-adjusted value), so it can't run away over time.
+const DIFFICULTY_LOOKBACK = 3;
+const DIFFICULTY_EASY_MULTIPLIER = 1.15;
+const DIFFICULTY_HARD_MULTIPLIER = 0.85;
+
+function recentDifficulties(exerciseId, workoutHistory, limit) {
+  const ratings = [];
+  for (const w of workoutHistory) {
+    for (const r of w.exerciseResults || []) {
+      if (r.exerciseId === exerciseId && r.difficulty) ratings.push(r.difficulty);
+    }
+  }
+  return ratings.slice(-(limit || DIFFICULTY_LOOKBACK));
+}
+
+function difficultyMultiplier(exerciseId, workoutHistory) {
+  const recent = recentDifficulties(exerciseId, workoutHistory, DIFFICULTY_LOOKBACK);
+  const easyCount = recent.filter((d) => d === "easy").length;
+  const hardCount = recent.filter((d) => d === "hard").length;
+  if (hardCount > easyCount) return DIFFICULTY_HARD_MULTIPLIER;
+  if (easyCount > hardCount) return DIFFICULTY_EASY_MULTIPLIER;
+  return 1;
+}
+
+// Adjusts only reps/hold-seconds, not sets — a smoother, more granular dial than
+// adding or dropping whole sets.
+function adjustedSetsReps(sets, reps, exerciseId, workoutHistory) {
+  const multiplier = difficultyMultiplier(exerciseId, workoutHistory);
+  const adjustedReps = multiplier === 1 ? reps : Math.max(1, Math.round(reps * multiplier));
+  return { sets, reps: adjustedReps };
+}
+
 function buildWeeklyPlan(profile) {
   const freq = Math.min(7, Math.max(1, profile.prescribedFrequency || 3));
   const template = DAY_TEMPLATES_BY_FREQ[freq];

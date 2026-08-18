@@ -9,6 +9,7 @@ const App = {
   photoLightboxId: null, photoLightboxUrl: null,
   logWeightModalOpen: false,
   customExModalOpen: false, customExerciseDraft: null,
+  newBadges: null,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -117,6 +118,8 @@ const ICONS = {
   trash: `<path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>`,
   download: `<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 19h16"/>`,
   "log-out": `<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M15 16l5-4-5-4"/><path d="M20 12H10"/>`,
+  award: `<circle cx="12" cy="8.5" r="4.5"/><path d="M9 12.5 7 20l5-3 5 3-2-7.5"/>`,
+  flame: `<path d="M12 21c-3.3 0-6-2.5-6-6 0-3.8 2.6-6.4 3.8-10 .6 2.3.9 4.3 1.7 4.3.8 0 1-2.2.7-4.6C15.4 7 18 10 18 15c0 3.5-2.7 6-6 6Z"/>`,
 };
 
 function iconHTML(name) {
@@ -527,6 +530,7 @@ function renderDashboard(screen) {
     ${App.restActive ? restModalHTML() : ""}
     ${App.logWeightModalOpen ? logWeightModalHTML() : ""}
     ${App.customExModalOpen ? customExerciseModalHTML() : ""}
+    ${achievementModalHTML()}
   `;
   bindDashboardModalEvents();
 }
@@ -1113,6 +1117,7 @@ function finishWorkout() {
   const doneSets = session.exercises.reduce((s, e) => s + e.done.filter(Boolean).length, 0);
   const completionPct = Math.round((doneSets / totalSets) * 100);
   const durationMin = Math.max(1, Math.round((Date.now() - session.startedAt) / 60000));
+  const historyBefore = db.workoutHistory;
   Store.completeWorkout({
     date: todayISO(),
     dayIndex: session.dayIndex,
@@ -1129,6 +1134,7 @@ function finishWorkout() {
     }),
     durationMin, completionPct,
   });
+  App.newBadges = newlyEarnedBadges(historyBefore, Store.get().workoutHistory);
   go("dashboard");
 }
 
@@ -1707,6 +1713,42 @@ async function deleteProgressPhotoRemote(photo) {
   } catch (e) {}
 }
 
+// ---------- Milestone badges ----------
+
+function milestonesCardHTML(workoutHistory) {
+  const earned = earnedBadgeIds(workoutHistory);
+  return `
+    <div class="card">
+      <div class="eyebrow">${iconHTML("award")}<span>Milestones</span></div>
+      <p class="muted small">${earned.size} of ${BADGES.length} earned</p>
+      <div class="badge-grid">
+        ${BADGES.map((b) => `
+          <div class="badge-tile ${earned.has(b.id) ? "earned" : ""}">
+            <span class="badge-icon">${iconHTML(b.icon)}</span>
+            <span class="badge-label">${escapeHtml(b.label)}</span>
+          </div>`).join("")}
+      </div>
+    </div>`;
+}
+
+function achievementModalHTML() {
+  if (!App.newBadges || !App.newBadges.length) return "";
+  return `
+    <div class="rest-modal-backdrop">
+      <div class="card rest-modal rest-modal-done">
+        <div class="rest-modal-icon">${iconHTML(App.newBadges[0].icon)}</div>
+        <div class="rest-modal-headline">Achievement Unlocked!</div>
+        <p class="muted">${App.newBadges.map((b) => escapeHtml(b.label)).join(" · ")}</p>
+        <button class="btn btn-primary btn-block" onclick="dismissAchievementModal()">${iconHTML("check")}<span>Nice!</span></button>
+      </div>
+    </div>`;
+}
+
+function dismissAchievementModal() {
+  App.newBadges = null;
+  render();
+}
+
 function renderAnalytics(screen) {
   const db = Store.get();
   const profile = db.profile;
@@ -1733,6 +1775,8 @@ function renderAnalytics(screen) {
       <h1>Progress</h1>
       <button class="btn btn-secondary" id="export-csv-btn">${iconHTML("download")}<span>Export CSV</span></button>
     </div>
+
+    ${milestonesCardHTML(db.workoutHistory)}
 
     <div class="card">
       <div class="eyebrow">${iconHTML("trending-down")}<span>Weight Trend</span></div>

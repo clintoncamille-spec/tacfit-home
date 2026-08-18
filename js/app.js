@@ -176,8 +176,17 @@ const DELAY_REASONS = [
   ["other", "Other"],
 ];
 
+// Editing an existing profile always gets the full step list (no mode choice —
+// the whole point of "Edit Full Profile" is filling in everything). Fresh
+// onboarding leads with a mode choice; the chosen path then determines the rest.
 function onboardingSteps() {
-  return [stepBasics, stepBodyGoals, stepAreasInjuries, stepHistory, stepStrength, stepSchedule, stepReview];
+  if (App.draft._editing) {
+    return [stepBasics, stepBodyGoals, stepAreasInjuries, stepHistory, stepStrength, stepSchedule, stepReview];
+  }
+  if (App.draft._fastPath) {
+    return [stepWelcomeChoice, stepQuickEssentials, stepQuickSchedule, stepReview];
+  }
+  return [stepWelcomeChoice, stepBasics, stepBodyGoals, stepAreasInjuries, stepHistory, stepStrength, stepSchedule, stepReview];
 }
 
 function renderOnboarding() {
@@ -191,7 +200,7 @@ function renderOnboarding() {
   App.root.innerHTML = `
     <div class="onboarding">
       <div class="onb-progress">${dots}</div>
-      <div class="onb-body">${steps[idx]()}</div>
+      <div class="onb-body">${steps[idx](idx)}</div>
     </div>`;
   bindStepEvents(idx);
 }
@@ -203,7 +212,62 @@ function onbNav(idx, total) {
   </div>`;
 }
 
-function stepBasics() {
+// No onbNav footer here — each option advances immediately on tap, since picking
+// a path *is* the action (see bindStepEvents' nav guard for the missing-.onb-nav case).
+function stepWelcomeChoice() {
+  return `
+    <h2>Let's Get Started</h2>
+    <p class="onb-sub">Choose how you'd like to set up your plan.</p>
+    <button type="button" class="card onb-mode-card" onclick="chooseOnboardingMode(true)">
+      <div class="eyebrow">${iconHTML("zap")}<span>Quick Start</span></div>
+      <p>Goal, injuries, and schedule — get a plan in under a minute. Fill in the rest later.</p>
+    </button>
+    <button type="button" class="card onb-mode-card" onclick="chooseOnboardingMode(false)">
+      <div class="eyebrow">${iconHTML("award")}<span>Full Setup</span></div>
+      <p>The most personalized plan — body type, training history, current strength. About 5 minutes.</p>
+    </button>
+  `;
+}
+
+function chooseOnboardingMode(fast) {
+  App.draft._fastPath = fast;
+  App.step = 1;
+  renderOnboarding();
+}
+
+function stepQuickEssentials(idx) {
+  const d = App.draft;
+  const injuryOpts = Object.entries(INJURY_LABELS).map(([k, v]) => [k, v]);
+  return `
+    <h2>The Essentials</h2>
+    <p class="onb-sub">Just enough to build a safe, effective plan — you can fill in the rest later.</p>
+    <label class="field-label">Primary Goal</label>
+    ${optionCards("primaryGoal", GOAL_OPTIONS, d.primaryGoal, false)}
+    <label class="field-label">Any injuries or trouble areas?</label>
+    ${optionCards("injuries", injuryOpts, d.injuries, true)}
+    <p class="onb-hint">We'll automatically avoid exercises that stress these areas.</p>
+    ${onbNav(idx, onboardingSteps().length)}
+  `;
+}
+
+function stepQuickSchedule(idx) {
+  const d = App.draft;
+  return `
+    <h2>Your Schedule</h2>
+    <p class="onb-sub">How much time can you give this?</p>
+    <label class="field-label">Days per week</label>
+    <select class="input" data-field="prescribedFrequency">
+      ${[2, 3, 4, 5, 6, 7].map((n) => `<option value="${n}" ${d.prescribedFrequency == n ? "selected" : ""}>${n}</option>`).join("")}
+    </select>
+    <label class="field-label">Minutes per session</label>
+    <select class="input" data-field="duration">
+      ${[15, 20, 30, 45, 60].map((n) => `<option value="${n}" ${d.duration == n ? "selected" : ""}>${n} minutes</option>`).join("")}
+    </select>
+    ${onbNav(idx, onboardingSteps().length)}
+  `;
+}
+
+function stepBasics(idx) {
   const d = App.draft;
   return `
     <h2>The Basics</h2>
@@ -234,7 +298,7 @@ function stepBasics() {
     <label class="field-label">Weight (${d.units === "metric" ? "kg" : "lb"})</label>
     <input class="input" data-field="weightRaw" type="number" min="1" value="${d.weightRaw || ""}">
 
-    ${onbNav(0, onboardingSteps().length)}
+    ${onbNav(idx, onboardingSteps().length)}
   `;
 }
 
@@ -247,7 +311,7 @@ function optionCards(field, options, current, multi) {
   </div>`;
 }
 
-function stepBodyGoals() {
+function stepBodyGoals(idx) {
   const d = App.draft;
   return `
     <h2>Body & Goals</h2>
@@ -259,11 +323,11 @@ function stepBodyGoals() {
     ${optionCards("primaryGoal", GOAL_OPTIONS, d.primaryGoal, false)}
     <label class="field-label">Weight loss target (optional, ${d.units === "metric" ? "kg" : "lb"})</label>
     <input class="input" data-field="targetLossRaw" type="number" min="0" value="${d.targetLossRaw || ""}" placeholder="e.g. 20">
-    ${onbNav(1, onboardingSteps().length)}
+    ${onbNav(idx, onboardingSteps().length)}
   `;
 }
 
-function stepAreasInjuries() {
+function stepAreasInjuries(idx) {
   const d = App.draft;
   const areaOpts = Object.entries(PROBLEM_AREA_LABELS).map(([k, v]) => [k, v]);
   const injuryOpts = Object.entries(INJURY_LABELS).map(([k, v]) => [k, v]);
@@ -275,11 +339,11 @@ function stepAreasInjuries() {
     <label class="field-label">Any injuries or trouble areas?</label>
     ${optionCards("injuries", injuryOpts, d.injuries, true)}
     <p class="onb-hint">We'll automatically avoid exercises that stress these areas.</p>
-    ${onbNav(2, onboardingSteps().length)}
+    ${onbNav(idx, onboardingSteps().length)}
   `;
 }
 
-function stepHistory() {
+function stepHistory(idx) {
   const d = App.draft;
   return `
     <h2>Training History</h2>
@@ -291,11 +355,11 @@ function stepHistory() {
     ${optionCards("weightPattern", WEIGHT_PATTERN_OPTIONS, d.weightPattern, false)}
     <label class="field-label">What's delayed getting back in shape?</label>
     ${optionCards("delayReasons", DELAY_REASONS, d.delayReasons, true)}
-    ${onbNav(3, onboardingSteps().length)}
+    ${onbNav(idx, onboardingSteps().length)}
   `;
 }
 
-function stepStrength() {
+function stepStrength(idx) {
   const d = App.draft;
   return `
     <h2>Current Strength</h2>
@@ -304,11 +368,11 @@ function stepStrength() {
     <input class="input" data-field="pushupsMax" type="number" min="0" value="${d.pushupsMax ?? ""}">
     <label class="field-label">Pull-ups (max, one round)</label>
     <input class="input" data-field="pullupsMax" type="number" min="0" value="${d.pullupsMax ?? ""}">
-    ${onbNav(4, onboardingSteps().length)}
+    ${onbNav(idx, onboardingSteps().length)}
   `;
 }
 
-function stepSchedule() {
+function stepSchedule(idx) {
   const d = App.draft;
   return `
     <h2>Schedule</h2>
@@ -326,11 +390,11 @@ function stepSchedule() {
     </select>
     <label class="field-label">Preferred time of day</label>
     ${optionCards("timeOfDay", [["morning", "Morning"], ["afternoon", "Afternoon"], ["evening", "Evening"], ["flexible", "Flexible"]], d.timeOfDay, false)}
-    ${onbNav(5, onboardingSteps().length)}
+    ${onbNav(idx, onboardingSteps().length)}
   `;
 }
 
-function stepReview() {
+function stepReview(idx) {
   const d = normalizeDraft(App.draft);
   const bmi = computeBMI(d.weightKg, d.heightCm);
   const cat = bmiCategory(bmi);
@@ -345,7 +409,7 @@ function stepReview() {
       <div class="review-item"><span>Focus Areas</span><b>${(d.problemAreas || []).map((a) => PROBLEM_AREA_LABELS[a]).join(", ") || "General"}</b></div>
       <div class="review-item"><span>Avoiding</span><b>${(d.injuries || []).map((a) => INJURY_LABELS[a]).join(", ") || "None"}</b></div>
     </div>
-    ${onbNav(6, onboardingSteps().length)}
+    ${onbNav(idx, onboardingSteps().length)}
   `;
 }
 
@@ -408,6 +472,7 @@ function bindStepEvents(idx) {
   });
 
   const nav = body.querySelector(".onb-nav");
+  if (!nav) return; // stepWelcomeChoice has no nav footer — its cards advance directly
   nav.querySelector('[data-nav="next"]').addEventListener("click", () => {
     const steps = onboardingSteps();
     if (idx === steps.length - 1) { finishOnboarding(); return; }
@@ -419,7 +484,15 @@ function bindStepEvents(idx) {
 }
 
 function finishOnboarding() {
+  // Completing the full wizard (whether that was the original path or a later
+  // "Finish Setup" edit) always clears quickStartUsed — the whole point of that
+  // flag is gating the dashboard's "finish your profile" nudge, and completing
+  // the full wizard is exactly what satisfies it.
+  const usedQuickStart = !!App.draft._fastPath;
   const profile = normalizeDraft(App.draft);
+  delete profile._fastPath;
+  delete profile._editing;
+  profile.quickStartUsed = usedQuickStart;
   profile.currentFrequency = Number(profile.currentFrequency) || 0;
   profile.prescribedFrequency = Number(profile.prescribedFrequency) || 3;
   profile.duration = Number(profile.duration) || 30;
@@ -427,7 +500,8 @@ function finishOnboarding() {
   profile.pullupsMax = Number(profile.pullupsMax) || 0;
   profile.updatedAt = todayISO();
   Store.saveProfile(profile);
-  Store.logWeight(profile.weightKg);
+  // Quick Start skips height/weight entirely — don't log a garbage undefined entry.
+  if (profile.weightKg) Store.logWeight(profile.weightKg);
   Store.logTest(profile.pushupsMax, profile.pullupsMax);
   const plan = buildWeeklyPlan(profile);
   Store.savePlan(plan);
@@ -476,6 +550,27 @@ function shiftCalendarMonth(delta) {
   if (screen) renderDashboard(screen);
 }
 
+// A short "why this plan" line promoted to the top of Today's Plan, rather than
+// only the generic BMI/strength insight further down the dashboard — this one is
+// specific to *today's* exercises, referencing the injuries/focus areas that
+// actually shaped which moves got picked (safeForProfile/pickFromPool in
+// workout-generator.js).
+function planRationaleText(profile, day) {
+  const injuries = profile.injuries || [];
+  const problemAreas = profile.problemAreas || [];
+  const dayTargets = new Set();
+  for (const ex of day.exercises) {
+    const meta = exerciseById(ex.exerciseId);
+    (meta.targets || []).forEach((t) => dayTargets.add(t));
+  }
+  const focus = problemAreas.filter((p) => dayTargets.has(p)).map((p) => PROBLEM_AREA_LABELS[p]);
+  const avoiding = injuries.map((i) => INJURY_LABELS[i]);
+  if (avoiding.length && focus.length) return `Focused on ${focus.join(", ")} today, avoiding ${avoiding.join(", ")}.`;
+  if (avoiding.length) return `Every move today avoids ${avoiding.join(", ")}, as you flagged.`;
+  if (focus.length) return `Extra focus on ${focus.join(", ")} today, based on your goals.`;
+  return `A well-rounded ${day.label.toLowerCase()} session, scaled to your ${profile.experience || "beginner"} level.`;
+}
+
 function renderDashboard(screen) {
   const db = Store.get();
   const profile = db.profile;
@@ -496,6 +591,7 @@ function renderDashboard(screen) {
     </div>
 
     ${reminderBannerHTML(profile, db.workoutHistory)}
+    ${completeProfileBannerHTML(profile)}
     ${accountBannerHTML()}
 
     ${quickActionToolbarHTML()}
@@ -515,6 +611,7 @@ function renderDashboard(screen) {
         <div>
           <div class="eyebrow">${iconHTML("play-circle")}<span>${activeSessionForToday ? "Resume Workout" : "Today's Plan"}</span></div>
           <h2>${day ? day.label : "Rest Day"}</h2>
+          ${day ? `<p class="plan-rationale muted">${escapeHtml(planRationaleText(profile, day))}</p>` : ""}
         </div>
         <div class="plan-meta">${day ? day.exercises.length + " exercises · ~" + profile.duration + " min" : ""}</div>
       </div>
@@ -807,6 +904,31 @@ function accountBannerHTML() {
 
 function dismissAccountBanner() {
   localStorage.setItem(BANNER_DISMISS_KEY, "1");
+  render();
+}
+
+// Nudges Quick Start users toward the full wizard (body type, training history,
+// current strength) for a more personalized plan. profile.quickStartUsed is
+// cleared automatically the next time they complete the full wizard — see
+// finishOnboarding() — so this naturally stops appearing once satisfied, on top
+// of the permanent per-profile dismiss below.
+const COMPLETE_PROFILE_DISMISS_KEY = "tacfit_complete_profile_dismissed";
+
+function completeProfileBannerHTML(profile) {
+  if (!profile.quickStartUsed || localStorage.getItem(COMPLETE_PROFILE_DISMISS_KEY)) return "";
+  return `
+    <div class="card">
+      <div class="eyebrow">${iconHTML("edit")}<span>Finish Your Profile</span></div>
+      <p class="muted">You used Quick Start — add your body type, training history, and current strength for a more personalized plan.</p>
+      <div class="row2">
+        <button class="btn btn-secondary" onclick="dismissCompleteProfileBanner()">${iconHTML("x")}<span>Later</span></button>
+        <button class="btn btn-primary" onclick="editProfile()">${iconHTML("chevron-right")}<span>Finish Setup</span></button>
+      </div>
+    </div>`;
+}
+
+function dismissCompleteProfileBanner() {
+  localStorage.setItem(COMPLETE_PROFILE_DISMISS_KEY, "1");
   render();
 }
 
@@ -2039,6 +2161,7 @@ async function handleAuthSubmit(screen, method) {
 
 function editProfile() {
   App.draft = { ...Store.getProfile() };
+  App.draft._editing = true;
   const h = cmToFeetIn(App.draft.heightCm || 170);
   App.draft.heightFt = h.ft; App.draft.heightIn = h.inch;
   App.draft.heightCmRaw = Math.round(App.draft.heightCm || 170);

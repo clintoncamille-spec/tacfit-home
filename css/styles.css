@@ -112,6 +112,7 @@ body {
 .plan-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .plan-card-head h2 { margin: 3px 0 0; font-size: 21px; font-weight: 800; letter-spacing: -0.015em; }
 .plan-meta { font-size: 12px; color: var(--text-dim); white-space: nowrap; font-weight: 600; }
+.plan-rationale { margin: 4px 0 0; font-size: 13px; }
 
 .chip-row { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0; }
 .chip { background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; }
@@ -188,6 +189,14 @@ body {
 .opt-sub { font-size: 11px; color: var(--text-dim); }
 
 .onb-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; }
+
+.onb-mode-card {
+  display: block; width: 100%; text-align: left; cursor: pointer; font-family: inherit;
+  transition: border-color 0.15s var(--ease), transform 0.1s var(--ease);
+}
+.onb-mode-card:active { transform: scale(0.98); }
+.onb-mode-card:hover { border-color: var(--accent); }
+.onb-mode-card p { margin: 0; color: var(--text-dim); font-size: 13.5px; line-height: 1.4; }
 
 .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .review-item { display: flex; flex-direction: column; gap: 3px; }

@@ -1009,7 +1009,7 @@ function sessionExerciseCard(se, i) {
   return `
     <div class="card ex-card ${allDone ? "complete" : ""}" style="animation-delay:${Math.min(i * 0.05, 0.3)}s">
       <div class="ex-card-head">
-        <div class="ex-pose">${POSES[ex.pose]}${allDone ? `<span class="complete-badge">${iconHTML("check")}</span>` : ""}</div>
+        <div class="ex-pose">${poseHTML(ex.pose)}${allDone ? `<span class="complete-badge">${iconHTML("check")}</span>` : ""}</div>
         <div>
           <h3>${escapeHtml(ex.name)}</h3>
           <p class="muted">${se.sets} sets × ${se.reps}${ex.isHold ? " sec" : " reps"}</p>
@@ -1389,7 +1389,7 @@ function templatePickerHTML(draft) {
     <div class="lib-list">
       ${items.map((ex) => `
         <div class="card lib-item tmpl-picker-item ${usedIds.has(ex.id) ? "added" : ""}" data-ex="${ex.id}">
-          <div class="ex-pose small">${POSES[ex.pose]}</div>
+          <div class="ex-pose small">${poseHTML(ex.pose)}</div>
           <div class="lib-item-body">
             <h3>${escapeHtml(ex.name)}</h3>
             <p class="muted">${CATEGORY_LABELS[ex.category]}</p>
@@ -1510,7 +1510,7 @@ function renderLibrary(screen) {
     else if (cat !== "all") items = items.filter((e) => e.category === cat);
     list.innerHTML = items.map((ex) => `
       <div class="card lib-item" onclick="viewExerciseHistory('${ex.id}')">
-        <div class="ex-pose small">${POSES[ex.pose]}</div>
+        <div class="ex-pose small">${poseHTML(ex.pose)}</div>
         <div class="lib-item-body">
           <h3>${escapeHtml(ex.name)}</h3>
           <p class="muted">${CATEGORY_LABELS[ex.category]}${ex.targets && ex.targets.length ? " · targets " + ex.targets.map((t) => PROBLEM_AREA_LABELS[t] || t).join(", ") : ""}</p>
@@ -1589,7 +1589,7 @@ function renderExerciseHistory() {
     </div>
 
     <div class="card ex-history-summary">
-      <div class="ex-pose ex-history-pose">${POSES[ex.pose]}</div>
+      <div class="ex-pose ex-history-pose">${poseHTML(ex.pose)}</div>
       <p class="muted">${CATEGORY_LABELS[ex.category]}${ex.targets && ex.targets.length ? " · targets " + ex.targets.map((t) => PROBLEM_AREA_LABELS[t] || t).join(", ") : ""}</p>
     </div>
 

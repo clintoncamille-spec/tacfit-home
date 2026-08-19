@@ -243,6 +243,7 @@ body {
 .ex-pose.small { width: 44px; height: 44px; }
 .ex-pose svg { width: 100%; height: 100%; fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; }
 .ex-card.complete .ex-pose svg { stroke: var(--accent); }
+.pose-img { width: 100%; height: 100%; object-fit: contain; }
 .ex-card-head h3 { margin: 0; font-size: 16.5px; font-weight: 700; letter-spacing: -0.01em; }
 .complete-badge {
   position: absolute; top: -4px; right: -4px; width: 20px; height: 20px; border-radius: 50%;

@@ -1,6 +1,6 @@
 // Cache-first service worker so the whole app works with zero network connectivity
 // after the first successful load.
-const CACHE = "tacfit-v22";
+const CACHE = "tacfit-v23";
 const ASSETS = [
   "./",
   "./index.html",
@@ -21,6 +21,26 @@ const ASSETS = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-180.png",
+  "./icons/poses/pushupBottom.png",
+  "./icons/poses/pushupTop.png",
+  "./icons/poses/pullup.png",
+  "./icons/poses/invertedRow.png",
+  "./icons/poses/dip.png",
+  "./icons/poses/squatBottom.png",
+  "./icons/poses/lunge.png",
+  "./icons/poses/stepUp.png",
+  "./icons/poses/gluteBridge.png",
+  "./icons/poses/wallSit.png",
+  "./icons/poses/standing.png",
+  "./icons/poses/plank.png",
+  "./icons/poses/sidePlank.png",
+  "./icons/poses/situp.png",
+  "./icons/poses/flutterKick.png",
+  "./icons/poses/superman.png",
+  "./icons/poses/mountainClimber.png",
+  "./icons/poses/burpeeJump.png",
+  "./icons/poses/jumpingJack.png",
+  "./icons/poses/bearCrawl.png",
 ];
 
 self.addEventListener("install", (event) => {

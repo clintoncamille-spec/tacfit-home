@@ -1,6 +1,6 @@
 // Cache-first service worker so the whole app works with zero network connectivity
 // after the first successful load.
-const CACHE = "tacfit-v24";
+const CACHE = "tacfit-v25";
 const ASSETS = [
   "./",
   "./index.html",

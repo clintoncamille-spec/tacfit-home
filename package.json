@@ -5,6 +5,7 @@
   "private": true,
   "main": "electron/main.js",
   "scripts": {
+    "test": "node --test",
     "sync:web": "rsync -a --delete index.html manifest.json sw.js css js icons www/",
     "cap:sync": "npm run sync:web && cap sync",
     "cap:android": "npm run sync:web && cap open android",

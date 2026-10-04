@@ -1,6 +1,6 @@
 // Cache-first service worker so the whole app works with zero network connectivity
 // after the first successful load.
-const CACHE = "tacfit-v23";
+const CACHE = "tacfit-v24";
 const ASSETS = [
   "./",
   "./index.html",
@@ -16,6 +16,7 @@ const ASSETS = [
   "./js/workout-generator.js",
   "./js/charts.js",
   "./js/badges.js",
+  "./js/insights.js",
   "./js/notifications.js",
   "./js/app.js",
   "./icons/icon-192.png",

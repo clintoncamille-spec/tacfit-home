@@ -104,6 +104,7 @@ const ICONS = {
   calendar: `<rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 10h16"/><path d="M8 3.5v4M16 3.5v4"/>`,
   "calendar-days": `<rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 10h16"/><path d="M8 3.5v4M16 3.5v4"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01"/>`,
   activity: `<path d="M3 12h4l2-7 4 14 2-7h6"/>`,
+  sparkles: `<path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3M6.5 6.5l2 2M15.5 15.5l2 2M6.5 17.5l2-2M15.5 8.5l2-2"/>`,
   "trending-up": `<path d="M4 17l6-6 4 4 6-8"/><path d="M14 6h6v6"/>`,
   "trending-down": `<path d="M4 7l6 6 4-4 6 8"/><path d="M20 11v6h-6"/>`,
   zap: `<path d="M13 3 6 14h5l-1 7 8-11h-5l1-7Z"/>`,
@@ -499,12 +500,19 @@ function finishOnboarding() {
   profile.pushupsMax = Number(profile.pushupsMax) || 0;
   profile.pullupsMax = Number(profile.pullupsMax) || 0;
   profile.updatedAt = todayISO();
-  Store.saveProfile(profile);
-  // Quick Start skips height/weight entirely — don't log a garbage undefined entry.
-  if (profile.weightKg) Store.logWeight(profile.weightKg);
-  Store.logTest(profile.pushupsMax, profile.pullupsMax);
   const plan = buildWeeklyPlan(profile);
-  Store.savePlan(plan);
+  Store.update((db) => {
+    db.profile = profile;
+    // Quick Start skips height/weight entirely — don't log a garbage undefined entry.
+    if (profile.weightKg) {
+      db.weightLog.push({ date: todayISO(), weightKg: profile.weightKg });
+      db.weightLog.sort((a, b) => a.date.localeCompare(b.date));
+    }
+    db.testLog.push({ date: todayISO(), pushups: profile.pushupsMax, pullups: profile.pullupsMax });
+    db.testLog.sort((a, b) => a.date.localeCompare(b.date));
+    db.currentPlan = plan;
+    return db;
+  });
   Notifications.sync(profile);
   App.draft = {}; App.step = 0;
   go("dashboard");
@@ -601,6 +609,8 @@ function renderDashboard(screen) {
       <div class="stat-tile"><span class="stat-num">${thisWeekCount}/${profile.prescribedFrequency}</span><span class="stat-label">This Week</span></div>
       <div class="stat-tile"><span class="stat-num">${bmi ? bmi.toFixed(1) : "—"}</span><span class="stat-label">${cat.label}</span></div>
     </div>
+
+    ${coachingInsightsHTML(profile, db.workoutHistory, plan)}
 
     ${todaysActivityHTML(db)}
 
@@ -770,10 +780,13 @@ function saveQuickWeight() {
   const errBox = document.getElementById("quick-weight-error");
   if (!raw || raw <= 0) { errBox.textContent = "Enter a valid weight."; return; }
   const kg = profile.units === "metric" ? raw : lbToKg(raw);
-  Store.logWeight(kg);
-  profile.weightKg = kg;
-  profile.updatedAt = todayISO();
-  Store.saveProfile(profile);
+  Store.update((db) => {
+    const nextProfile = { ...(db.profile || profile), ...profile, weightKg: kg, updatedAt: todayISO() };
+    db.profile = nextProfile;
+    db.weightLog.push({ date: todayISO(), weightKg: kg });
+    db.weightLog.sort((a, b) => a.date.localeCompare(b.date));
+    return db;
+  });
   closeLogWeightModal();
 }
 
@@ -843,12 +856,15 @@ function saveCustomExercise() {
   if (!d.name.trim()) { errBox.textContent = "Give it a name."; return; }
   const sets = Math.max(1, Number(d.sets) || 1);
   const reps = Math.max(1, Number(d.reps) || 1);
-  Store.addCustomExercise({
-    id: "custom_" + crypto.randomUUID(),
-    name: d.name.trim(), category: d.category, pose: "custom",
-    targets: [], avoidInjuries: [], isHold: d.isHold,
-    scale: { beginner: [sets, reps], intermediate: [sets, reps], advanced: [sets, reps] },
-    steps: [],
+  Store.update((db) => {
+    db.customExercises.push({
+      id: "custom_" + crypto.randomUUID(),
+      name: d.name.trim(), category: d.category, pose: "custom",
+      targets: [], avoidInjuries: [], isHold: d.isHold,
+      scale: { beginner: [sets, reps], intermediate: [sets, reps], advanced: [sets, reps] },
+      steps: [],
+    });
+    return db;
   });
   closeCustomExerciseModal();
 }
@@ -971,7 +987,10 @@ function startWorkout(dayIndex) {
       return { exerciseId: ex.exerciseId, sets, reps, done: new Array(sets).fill(false), warmup: new Array(sets).fill(false), difficulty: null };
     }),
   };
-  Store.saveSession(session);
+  Store.update((nextDb) => {
+    nextDb.activeSession = session;
+    return nextDb;
+  });
   go("session");
 }
 
@@ -1047,7 +1066,10 @@ function setDifficulty(exIdx, value) {
   const db = Store.get();
   const session = db.activeSession;
   session.exercises[exIdx].difficulty = value;
-  Store.saveSession(session);
+  Store.update((nextDb) => {
+    nextDb.activeSession = session;
+    return nextDb;
+  });
   renderSession();
 }
 
@@ -1056,7 +1078,10 @@ function toggleSet(exIdx, setIdx) {
   const session = db.activeSession;
   const se = session.exercises[exIdx];
   se.done[setIdx] = !se.done[setIdx];
-  Store.saveSession(session);
+  Store.update((nextDb) => {
+    nextDb.activeSession = session;
+    return nextDb;
+  });
   if (se.done[setIdx] && !se.done.every(Boolean)) startRestTimer(App.restDuration);
   else renderSession();
 }
@@ -1067,7 +1092,10 @@ function toggleSetWarmup(exIdx, setIdx) {
   const se = session.exercises[exIdx];
   if (!se.warmup) se.warmup = new Array(se.sets).fill(false);
   se.warmup[setIdx] = !se.warmup[setIdx];
-  Store.saveSession(session);
+  Store.update((nextDb) => {
+    nextDb.activeSession = session;
+    return nextDb;
+  });
   renderSession();
 }
 
@@ -1320,7 +1348,10 @@ function cancelTemplateEdit() {
 
 function deleteTemplateConfirm(id) {
   if (confirm("Delete this template?")) {
-    Store.deleteTemplate(id);
+    Store.update((db) => {
+      db.workoutTemplates = db.workoutTemplates.filter((t) => t.id !== id);
+      return db;
+    });
     renderTemplates();
   }
 }
@@ -1450,12 +1481,18 @@ function saveTemplateDraft() {
   if (!name) { errBox.textContent = "Give this template a name."; return; }
   if (!draft.exercises.length) { errBox.textContent = "Add at least one exercise."; return; }
   const now = new Date().toISOString();
-  Store.saveTemplate({
-    id: draft.id,
-    name,
-    exercises: draft.exercises,
-    createdAt: draft.createdAt || now,
-    updatedAt: now,
+  Store.update((db) => {
+    const template = {
+      id: draft.id,
+      name,
+      exercises: draft.exercises,
+      createdAt: draft.createdAt || now,
+      updatedAt: now,
+    };
+    const idx = db.workoutTemplates.findIndex((t) => t.id === template.id);
+    if (idx >= 0) db.workoutTemplates[idx] = template;
+    else db.workoutTemplates.push(template);
+    return db;
   });
   App.templateEditing = null;
   App.templatePickerOpen = false;
@@ -1487,7 +1524,10 @@ function startWorkoutFromTemplate(templateId) {
       return { exerciseId: ex.exerciseId, sets, reps, done: new Array(sets).fill(false), warmup: new Array(sets).fill(false), difficulty: null };
     }),
   };
-  Store.saveSession(session);
+  Store.update((db) => {
+    db.activeSession = session;
+    return db;
+  });
   go("session");
 }
 
@@ -2067,10 +2107,12 @@ function renderSettings(screen) {
     const raw = Number(document.getElementById("new-weight").value);
     if (!raw) return;
     const kg = profile.units === "metric" ? raw : lbToKg(raw);
-    Store.logWeight(kg);
-    profile.weightKg = kg;
-    profile.updatedAt = todayISO();
-    Store.saveProfile(profile);
+    Store.update((db) => {
+      db.profile = { ...(db.profile || profile), ...profile, weightKg: kg, updatedAt: todayISO() };
+      db.weightLog.push({ date: todayISO(), weightKg: kg });
+      db.weightLog.sort((a, b) => a.date.localeCompare(b.date));
+      return db;
+    });
     renderSettings(screen);
   });
   document.getElementById("reset-btn").addEventListener("click", () => {
@@ -2086,7 +2128,10 @@ function renderSettings(screen) {
 function setRemindersEnabled(profile, screen, enabled) {
   profile.remindersEnabled = enabled;
   profile.updatedAt = todayISO();
-  Store.saveProfile(profile);
+  Store.update((db) => {
+    db.profile = { ...(db.profile || profile), ...profile, remindersEnabled: enabled, updatedAt: todayISO() };
+    return db;
+  });
   Notifications.sync(profile);
   renderSettings(screen);
 }

@@ -1,12 +1,43 @@
 // All persistence is local-only (localStorage) — the app never talks to a network.
 const DB_KEY = "tacfit_v1";
+const DB_VERSION = 1;
+
+function isObjectShape(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function sanitizeList(value) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry) => isObjectShape(entry));
+}
+
+function migrateDB(raw) {
+  if (!raw || typeof raw !== "object") return defaultDB();
+
+  const base = defaultDB();
+  base.version = DB_VERSION;
+
+  // Older data blobs may have been saved before schema versioning existed, or may
+  // have been partially populated while the app was still evolving. Normalize them
+  // to the current shape so the app always reads a sane dataset.
+  const listFields = ["weightLog", "testLog", "workoutHistory", "workoutTemplates", "progressPhotos", "customExercises"];
+  for (const key of listFields) {
+    base[key] = sanitizeList(raw[key]);
+  }
+
+  base.profile = isObjectShape(raw.profile) ? raw.profile : null;
+  base.currentPlan = isObjectShape(raw.currentPlan) ? raw.currentPlan : null;
+  base.activeSession = isObjectShape(raw.activeSession) ? raw.activeSession : null;
+
+  return base;
+}
 
 function loadDB() {
   try {
     const raw = localStorage.getItem(DB_KEY);
     if (!raw) return defaultDB();
     const parsed = JSON.parse(raw);
-    return { ...defaultDB(), ...parsed };
+    return migrateDB(parsed);
   } catch (e) {
     return defaultDB();
   }
@@ -14,6 +45,7 @@ function loadDB() {
 
 function defaultDB() {
   return {
+    version: DB_VERSION,
     profile: null,          // see PROFILE shape below, set during onboarding
     weightLog: [],          // [{date, weightKg}]
     testLog: [],            // [{date, pushups, pullups}]
@@ -27,12 +59,25 @@ function defaultDB() {
 }
 
 function saveDB(db) {
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  const normalized = migrateDB(db || defaultDB());
+  localStorage.setItem(DB_KEY, JSON.stringify(normalized));
 }
 
 const Store = {
   get: loadDB,
   save: saveDB,
+
+  // Centralizes DB mutation through a single normalized write path so callers do
+  // not have to manually read/merge/save raw localStorage data themselves.
+  update(mutator) {
+    const db = loadDB();
+    const next = typeof mutator === "function" ? mutator(db) : db;
+    saveDB(next || db);
+    if (typeof Sync !== "undefined" && typeof Sync.schedulePush === "function") {
+      Sync.schedulePush();
+    }
+    return loadDB();
+  },
 
   getProfile() { return loadDB().profile; },
   saveProfile(profile) {
